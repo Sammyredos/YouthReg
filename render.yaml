@@ -1,0 +1,96 @@
+services:
+  - type: web
+    name: Mopgomyouth
+    env: node
+    plan: free
+    buildCommand: |
+      echo "🚀 Starting Mopgomyouth build process..." &&
+      echo "📦 Installing dependencies..." &&
+      npm ci &&
+      echo "✅ Dependencies installed successfully" &&
+      echo "🔧 Generating Prisma client for PostgreSQL..." &&
+      npx prisma generate &&
+      echo "✅ Prisma client generated" &&
+      echo "🗄️ Deploying database migrations..." &&
+      npx prisma migrate deploy &&
+      echo "✅ Database migrations deployed" &&
+      echo "👑 Setting up Super Admin account..." &&
+      (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
+      echo "⚙️ Seeding system settings..." &&
+      (npx tsx scripts/seed-settings.ts && echo "✅ Settings seeded successfully" || echo "⚠️ Settings seeding skipped (may already exist)") &&
+      echo "🏗️ Building Next.js application..." &&
+      npm run build &&
+      echo "🎉 Mopgomyouth build completed successfully!" &&
+      echo "🔗 Your app will be available at: https://mopgomyouth.onrender.com" &&
+      echo "👤 Super Admin Login: admin@mopgomglobal.com / SuperAdmin123!"
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: youth-registration-database
+          property: connectionString
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: NEXTAUTH_URL
+        value: https://mopgomyouth.onrender.com
+      - key: SUPER_ADMIN_PASSWORD
+        value: SuperAdmin123!
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: REDIS_URL
+        value: ""
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: LOG_LEVEL
+        value: "info"
+      - key: HEALTH_CHECK_ENABLED
+        value: "true"
+      - key: GDPR_ENABLED
+        value: "true"
+      - key: DATA_RETENTION_DAYS
+        value: "2555"
+      - key: CONSENT_VERSION
+        value: "1.0"
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        value: samuel.obadina93@gmail.com
+      - key: SMTP_PASS
+        value: "mlre wwdl wnvr vimd"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: EMAIL_FROM_NAME
+        value: MopgomYouth
+      - key: EMAIL_REPLY_TO
+        value: noreply@mopgomyouth.com
+      - key: ADMIN_EMAILS
+        value: admin@youthreg.com,samuel.obadina93@gmail.com
+      - key: EMAIL_NOTIFICATIONS_ENABLED
+        value: "true"
+      - key: SEND_REGISTRATION_EMAILS
+        value: "true"
+      - key: SEND_ADMIN_NOTIFICATIONS
+        value: "true"
+      - key: SECURITY_HEADERS_ENABLED
+        value: "true"
+      - key: CSP_ENABLED
+        value: "true"
+      - key: HSTS_ENABLED
+        value: "true"
+      - key: BACKUP_ENCRYPTION
+        value: "true"
+      - key: BACKUP_ENCRYPTION_KEY
+        generateValue: true
+
+databases:
+  - name: youth-registration-database
+    plan: free
+    databaseName: youth_registration
+    user: youth_user
