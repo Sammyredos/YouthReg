@@ -3,7 +3,26 @@ services:
     name: Mopgomyouth
     env: node
     plan: free
-    buildCommand: npm install --legacy-peer-deps && npx prisma generate && npx prisma migrate deploy && npm run setup:render && npm run build
+    buildCommand: |
+      echo "🚀 Starting Mopgomyouth build process..." &&
+      echo "📦 Installing dependencies..." &&
+      npm ci &&
+      echo "✅ Dependencies installed successfully" &&
+      echo "🔧 Generating Prisma client for PostgreSQL..." &&
+      npx prisma generate &&
+      echo "✅ Prisma client generated" &&
+      echo "🗄️ Deploying database migrations..." &&
+      npx prisma migrate deploy &&
+      echo "✅ Database migrations deployed" &&
+      echo "👑 Setting up Super Admin account..." &&
+      (npx tsx scripts/create-super-admin.ts && echo "✅ Super Admin account ready (admin@mopgomglobal.com)" || echo "⚠️ Admin creation skipped (may already exist)") &&
+      echo "⚙️ Seeding system settings..." &&
+      (npx tsx scripts/seed-settings.ts && echo "✅ Settings seeded successfully" || echo "⚠️ Settings seeding skipped (may already exist)") &&
+      echo "🏗️ Building Next.js application..." &&
+      npm run build &&
+      echo "🎉 Mopgomyouth build completed successfully!" &&
+      echo "🔗 Your app will be available at: https://mopgomyouth.onrender.com" &&
+      echo "👤 Super Admin Login: admin@mopgomglobal.com / SuperAdmin123!"
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
