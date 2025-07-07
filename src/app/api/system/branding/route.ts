@@ -22,7 +22,7 @@ export async function GET() {
     const logoUrlSetting = brandingSettings.find(s => s.key === 'logoUrl')
 
     let systemName = 'Mopgomglobal' // Default fallback
-    let logoUrl = null
+    let logoUrl: string | null = null
 
     if (systemNameSetting) {
       try {

@@ -10,7 +10,7 @@
     "build:render": "echo '🚀 Starting build...' && npm install --legacy-peer-deps && echo '✅ Dependencies installed' && npx prisma generate && echo '✅ Prisma generated' && npx prisma migrate deploy && echo '✅ Migrations deployed' && npx tsx scripts/create-super-admin.ts && echo '✅ Admin created' && npm run build && echo '🎉 Build completed!'",
     "deploy:production": "npx tsx scripts/deploy-production.ts",
     "test:production": "npx tsx scripts/test-production-setup.ts",
-
+    "postinstall": "npx prisma generate",
     "start": "next start",
     "start:production": "cross-env NODE_ENV=production next start",
     "lint": "next lint",
@@ -43,6 +43,7 @@
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-switch": "^1.2.5",
     "@radix-ui/react-tabs": "^1.1.12",
+    "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.21",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
@@ -65,11 +66,10 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.7",
-    "@types/node": "^24.0.10",
+    "@types/node": "24.0.10",
     "@types/nodemailer": "^6.4.15",
     "@types/qrcode": "^1.5.5",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "19.1.8",
     "cross-env": "^7.0.3",
     "eslint": "^9.15.0",
     "eslint-config-next": "^15.3.3",
@@ -77,7 +77,7 @@
     "prisma": "^6.11.0",
     "rimraf": "^6.0.1",
     "tsx": "^4.19.2",
-    "typescript": "^5.8.3"
+    "typescript": "5.8.3"
   },
   "engines": {
     "node": ">=18.0.0",
