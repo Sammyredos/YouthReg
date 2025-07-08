@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
 
     const currentUser = authResult.user!
 
-    // Check if user has permission to read users (Super Admin, Admin, Manager)
-    if (!hasPermission(currentUser, 'users:read') && !['Super Admin', 'Admin', 'Manager'].includes(currentUser.role?.name || '')) {
+    // Check if user has permission to read users (Super Admin, Admin, Manager, Staff)
+    if (!hasPermission(currentUser, 'users:read') && !['Super Admin', 'Admin', 'Manager', 'Staff'].includes(currentUser.role?.name || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
@@ -181,8 +181,8 @@ export async function POST(request: NextRequest) {
 
     const currentUser = authResult.user!
 
-    // Check if user has permission to create users (Super Admin, Admin, Manager)
-    if (!hasPermission(currentUser, 'users:write') && !['Super Admin', 'Admin', 'Manager'].includes(currentUser.role?.name || '')) {
+    // Check if user has permission to create users (Super Admin, Admin, Manager, Staff)
+    if (!hasPermission(currentUser, 'users:write') && !['Super Admin', 'Admin', 'Manager', 'Staff'].includes(currentUser.role?.name || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

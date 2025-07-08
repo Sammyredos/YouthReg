@@ -65,7 +65,7 @@ services:
       - key: SMTP_USER
         value: samuel.obadina93@gmail.com
       - key: SMTP_PASS
-        value: "mlre wwdl wnvr vimd"
+        value: gdjr ryiz gjwx yekm
       - key: SMTP_SECURE
         value: "false"
       - key: EMAIL_FROM_NAME

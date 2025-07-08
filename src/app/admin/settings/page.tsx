@@ -856,95 +856,7 @@ export default function SettingsPage() {
     }
   }
 
-  const restoreSystemBackup = async () => {
-    // Use ErrorModal for confirmation instead of browser confirm
-    setErrorModal({
-      isOpen: true,
-      type: 'warning',
-      title: 'Restore System Backup',
-      description: 'Are you sure you want to restore the system backup? This will update all settings with the backup values including the SMTP password configuration.',
-      details: 'This action will overwrite current settings with backup data. Make sure you have a recent backup of your current settings if needed.',
-      errorCode: 'BACKUP_RESTORE_CONFIRM',
-      showRetry: false,
-      showContactSupport: false
-    })
-  }
 
-  const confirmRestoreSystemBackup = async () => {
-    setErrorModal(prev => ({ ...prev, isOpen: false }))
-    setLoading(true)
-
-    try {
-      const response = await fetch('/api/admin/settings/restore-backup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        success(
-          'System Backup Restored Successfully',
-          `Restored ${data.summary.imported} new settings and updated ${data.summary.updated} existing settings.${data.email_status.configured ? ' Email configuration with SMTP password is now complete!' : ''}`
-        )
-        // Reload settings to show the restored data
-        await loadSettings()
-      } else {
-        throw new Error(data.error || 'Failed to restore system backup')
-      }
-    } catch (err) {
-      const errorMessage = parseApiError(err)
-      setErrorModal({
-        isOpen: true,
-        type: 'error',
-        title: 'System Backup Restore Failed',
-        description: 'Unable to restore the system backup. This could be due to corrupted backup data or server issues.',
-        details: `Error: ${errorMessage}\nTime: ${new Date().toISOString()}`,
-        errorCode: 'BACKUP_RESTORE_ERROR'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const exportSettings = async () => {
-    try {
-      setLoading(true)
-
-      const response = await fetch('/api/admin/settings/export', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to export settings')
-      }
-
-      const data = await response.json()
-
-      // Create and download the backup file
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `system-backup-${new Date().toISOString().split('T')[0]}.json`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      success('Export Successful', 'Settings exported successfully!')
-    } catch (err) {
-      console.error('Error exporting settings:', err)
-      error('Export Failed', err instanceof Error ? err.message : 'Failed to export settings')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -1734,523 +1646,48 @@ export default function SettingsPage() {
   )
 
   // Communications Tab Content
-  const renderCommunicationsTab = () => {
-    try {
-
-      return (
-        <div className="space-y-6">
-          {/* Email Configuration Card */}
-          {settings.email && Array.isArray(settings.email) && settings.email.length > 0 ? (
-            <Card className="p-6 bg-white">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="h-12 w-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mr-4">
-                <Mail className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-apercu-bold text-lg text-gray-900">Email Configuration</h3>
-                <p className="font-apercu-regular text-sm text-gray-600">SMTP settings and email preferences</p>
-              </div>
-            </div>
-            {renderEditButtons('email')}
-          </div>
-
-          <div className="space-y-4">
-            {settings.email.filter(setting => setting && setting.key).map((setting) => (
-              <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
-                <div className="flex-1 min-w-0 lg:pr-4">
-                  <p className="font-apercu-medium text-sm text-gray-900">{setting.name || 'Unknown Setting'}</p>
-                  {setting.description && (
-                    <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
-                  )}
-                </div>
-                <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
-                  {renderSettingInput('email', setting)}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Email Test Section */}
-          {editingCategory !== 'email' && (
-            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <h4 className="font-apercu-bold text-sm text-green-800 mb-3">Test Email Configuration</h4>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="email"
-                  value={testEmail}
-                  onChange={(e) => setTestEmail(e.target.value)}
-                  placeholder="Enter email address to test"
-                  className="flex-1 px-3 py-2 border border-green-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
-                />
-                <Button
-                  onClick={testEmailConfiguration}
-                  disabled={testingEmail || !testEmail}
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 font-apercu-medium"
-                >
-                  {testingEmail ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="h-4 w-4 mr-2" />
-                      Send Test Email
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
-        </Card>
-      ) : (
-        <Card className="p-6 bg-white">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="h-12 w-12 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center mr-4">
-                <Mail className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-apercu-bold text-lg text-gray-900">Email Configuration</h3>
-                <p className="font-apercu-regular text-sm text-gray-600">Configure email messaging settings</p>
-              </div>
-            </div>
-          </div>
-          <div className="text-center py-8">
-            <Mail className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-            <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">Email Tab Available</h3>
-            <p className="font-apercu-regular text-sm text-gray-600 mb-4">
-              Email settings will be configured here. This tab is now accessible to Super Admin users.
-            </p>
-            <p className="font-apercu-regular text-xs text-gray-500 mb-4">
-              Configure SMTP settings, email templates, and notification preferences.
-            </p>
-
-            {/* Auto-configure from Environment Variables Button */}
-            {currentUser?.role?.name === 'Super Admin' && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
-                <h4 className="font-apercu-bold text-sm text-blue-800 mb-2">Email Setup Options</h4>
-                <p className="font-apercu-regular text-sm text-blue-700 mb-3">
-                  Initialize email settings or configure from environment variables.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button
-                    onClick={initializeEmailSettings}
-                    disabled={loading}
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 font-apercu-medium"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Initializing...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Initialize Email Settings
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    onClick={configureEmailFromEnv}
-                    disabled={loading}
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 font-apercu-medium"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Configuring...
-                      </>
-                    ) : (
-                      <>
-                        <Settings className="h-4 w-4 mr-2" />
-                        Auto-Configure from Env
-                      </>
-                    )}
-                  </Button>
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleSettingsImport}
-                      disabled={loading}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                      id="settings-import"
-                    />
-                    <label
-                      htmlFor="settings-import"
-                      className={`inline-flex items-center px-3 py-2 text-sm font-apercu-medium rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed ${
-                        loading
-                          ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                          : 'bg-purple-600 hover:bg-purple-700 text-white'
-                      }`}
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Importing...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="h-4 w-4 mr-2" />
-                          Import Backup
-                        </>
-                      )}
-                    </label>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {currentUser?.role?.name === 'Admin' && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-4">
-                <p className="text-amber-700 text-sm">
-                  You have read-only access to this tab as an Admin user.
-                </p>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {/* SMS Configuration Card */}
-      {settings.sms && Array.isArray(settings.sms) && settings.sms.length > 0 ? (
-        <Card className="p-6 bg-white">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="h-12 w-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mr-4">
-                <Phone className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-apercu-bold text-lg text-gray-900">SMS Configuration</h3>
-                <p className="font-apercu-bold text-sm text-gray-600">SMS provider settings and preferences</p>
-              </div>
-            </div>
-            {renderEditButtons('sms')}
-          </div>
-
-          <div className="space-y-4">
-            {settings.sms.filter(setting => setting && setting.key).map((setting) => (
-              <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
-                <div className="flex-1 min-w-0 lg:pr-4">
-                  <p className="font-apercu-medium text-sm text-gray-900">{setting.name || 'Unknown Setting'}</p>
-                  {setting.description && (
-                    <p className="font-apercu-bold text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
-                  )}
-                </div>
-                <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
-                  {renderSettingInput('sms', setting)}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* SMS Test Section */}
-          {editingCategory !== 'sms' && (
-            <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-              <h4 className="font-apercu-bold text-sm text-purple-800 mb-3">Test SMS Configuration</h4>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="tel"
-                  value={testPhone}
-                  onChange={(e) => setTestPhone(e.target.value)}
-                  placeholder="Enter phone number to test (+1234567890)"
-                  className="flex-1 px-3 py-2 border border-purple-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
-                />
-                <Button
-                  onClick={testSmsConfiguration}
-                  disabled={testingSms || !testPhone}
-                  size="sm"
-                  className="bg-purple-600 hover:bg-purple-700 font-apercu-medium"
-                >
-                  {testingSms ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Phone className="h-4 w-4 mr-2" />
-                      Send Test SMS
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
-        </Card>
-      ) : (
-        <Card className="p-6 bg-white">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="h-12 w-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mr-4">
-                <Phone className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-apercu-bold text-lg text-gray-900">SMS Configuration</h3>
-                <p className="font-apercu-regular text-sm text-gray-600">Configure SMS messaging settings</p>
-              </div>
-            </div>
-          </div>
-          <div className="text-center py-8">
-            <Phone className="h-12 w-12 text-purple-500 mx-auto mb-4" />
-            <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">SMS Tab Available</h3>
-            <p className="font-apercu-regular text-sm text-gray-600 mb-4">
-              SMS settings will be configured here. This tab is now accessible to Super Admin users.
-            </p>
-            <p className="font-apercu-regular text-xs text-gray-500 mb-4">
-              Configure SMS providers, API keys, and messaging preferences.
-            </p>
-            {currentUser?.role?.name === 'Admin' && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-4">
-                <p className="text-amber-700 text-sm">
-                  You have read-only access to this tab as an Admin user.
-                </p>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
+  const renderCommunicationsTab = () => (
+    <div className="space-y-6">
+      <Card className="p-6 bg-white">
+        <div className="text-center py-8">
+          <Mail className="h-12 w-12 text-blue-400 mx-auto mb-4" />
+          <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">Communications</h3>
+          <p className="font-apercu-regular text-sm text-gray-600">
+            Communications settings are available in Data Management.
+          </p>
+        </div>
+      </Card>
     </div>
-    )
-  } catch (error) {
-    console.error('Error rendering communications tab:', error)
-    return (
-      <div className="space-y-6">
-        <Card className="p-6 bg-white">
-          <div className="text-center py-8">
-            <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-            <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">Error Loading Communications</h3>
-            <p className="font-apercu-bold text-sm text-gray-600">
-              There was an error loading the communications settings. Please refresh the page.
-            </p>
-          </div>
-        </Card>
-      </div>
-    )
-  }
-}
+
+  )
 
   // Security Tab Content
   const renderSecurityTab = () => (
     <div className="space-y-6">
-      {/* Read-Only Warning for Admin Users */}
-      {currentUser?.role?.name === 'Admin' && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-amber-800">Read-Only Access</h3>
-              <p className="text-sm text-amber-700 mt-1">
-                You have read-only access to security settings. Only Super Admins can modify these settings.
-              </p>
-            </div>
-          </div>
+      <Card className="p-6 bg-white">
+        <div className="text-center py-8">
+          <Shield className="h-12 w-12 text-red-400 mx-auto mb-4" />
+          <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">Security</h3>
+          <p className="font-apercu-regular text-sm text-gray-600">
+            Security settings are available in Data Management.
+          </p>
         </div>
-      )}
-      {/* Security Settings Card */}
-      {settings.security && Array.isArray(settings.security) && settings.security.length > 0 ? (
-        <Card className="p-6 bg-white">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="h-12 w-12 bg-gradient-to-r from-red-500 to-pink-600 rounded-xl flex items-center justify-center mr-4">
-                <Shield className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-apercu-bold text-lg text-gray-900">Security Settings</h3>
-                <p className="font-apercu-regular text-sm text-gray-600">Authentication and security preferences</p>
-              </div>
-            </div>
-            {renderEditButtons('security')}
-          </div>
-
-          <div className="space-y-4">
-            {settings.security.map((setting) => (
-              <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
-                <div className="flex-1 min-w-0 lg:pr-4">
-                  <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
-                  {setting.description && (
-                    <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
-                  )}
-                </div>
-                <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
-                  {renderSettingInput('security', setting)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      ) : (
-        <Card className="p-6 bg-white">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="h-12 w-12 bg-gradient-to-r from-red-500 to-pink-600 rounded-xl flex items-center justify-center mr-4">
-                <Shield className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-apercu-bold text-lg text-gray-900">Security Settings</h3>
-                <p className="font-apercu-regular text-sm text-gray-600">Authentication and security preferences</p>
-              </div>
-            </div>
-          </div>
-          <div className="text-center py-8">
-            <Shield className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">Security Tab Available</h3>
-            <p className="font-apercu-regular text-sm text-gray-600 mb-4">
-              Security settings will be configured here. This tab is now accessible to Super Admin users.
-            </p>
-            <p className="font-apercu-regular text-xs text-gray-500 mb-4">
-              Configure authentication, password policies, and security preferences.
-            </p>
-            {currentUser?.role?.name === 'Admin' && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-4">
-                <p className="text-amber-700 text-sm">
-                  You have read-only access to this tab as an Admin user.
-                </p>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {/* User Management Card */}
-      {settings.userManagement && Array.isArray(settings.userManagement) && settings.userManagement.length > 0 ? (
-        <Card className="p-6 bg-white">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="h-12 w-12 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center mr-4">
-                <Users className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-apercu-bold text-lg text-gray-900">User Management</h3>
-                <p className="font-apercu-regular text-sm text-gray-600">User roles and permissions</p>
-              </div>
-            </div>
-            {renderEditButtons('userManagement')}
-          </div>
-
-          <div className="space-y-4">
-            {settings.userManagement.map((setting) => (
-              <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
-                <div className="flex-1 min-w-0 lg:pr-4">
-                  <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
-                  {setting.description && (
-                    <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
-                  )}
-                </div>
-                <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
-                  {renderSettingInput('userManagement', setting)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      ) : (
-        <Card className="p-6 bg-white">
-          <div className="text-center py-8">
-            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">User Management Settings Not Available</h3>
-            <p className="font-apercu-regular text-sm text-gray-600">
-              User management settings are not configured. Please contact your administrator.
-            </p>
-          </div>
-        </Card>
-      )}
+      </Card>
     </div>
   )
 
   // Notifications Tab Content
   const renderNotificationsTab = () => (
     <div className="space-y-6">
-      {/* Read-Only Warning for Admin Users */}
-      {currentUser?.role?.name === 'Admin' && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-amber-800">Read-Only Access</h3>
-              <p className="text-sm text-amber-700 mt-1">
-                You have read-only access to notification settings. Only Super Admins can modify these settings.
-              </p>
-            </div>
-          </div>
+      <Card className="p-6 bg-white">
+        <div className="text-center py-8">
+          <Bell className="h-12 w-12 text-yellow-400 mx-auto mb-4" />
+          <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">Notifications</h3>
+          <p className="font-apercu-regular text-sm text-gray-600">
+            Notification settings are available in Data Management.
+          </p>
         </div>
-      )}
-      {settings.notifications && Array.isArray(settings.notifications) && settings.notifications.length > 0 ? (
-        <Card className="p-6 bg-white">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="h-12 w-12 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center mr-4">
-                <Bell className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-apercu-bold text-lg text-gray-900">Notification Settings</h3>
-                <p className="font-apercu-regular text-sm text-gray-600">Configure notification preferences</p>
-              </div>
-            </div>
-            {renderEditButtons('notifications')}
-          </div>
-
-          <div className="space-y-4">
-            {settings.notifications.map((setting) => (
-              <div key={setting.key} className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-3 border-b border-gray-100 last:border-b-0 space-y-3 lg:space-y-0">
-                <div className="flex-1 min-w-0 lg:pr-4">
-                  <p className="font-apercu-medium text-sm text-gray-900">{setting.name}</p>
-                  {setting.description && (
-                    <p className="font-apercu-regular text-xs text-gray-500 mt-1 break-words">{setting.description}</p>
-                  )}
-                </div>
-                <div className="flex items-center justify-start lg:justify-end lg:flex-shrink-0">
-                  {renderSettingInput('notifications', setting)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      ) : (
-        <Card className="p-6 bg-white">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="h-12 w-12 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center mr-4">
-                <Bell className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-apercu-bold text-lg text-gray-900">Notification Settings</h3>
-                <p className="font-apercu-regular text-sm text-gray-600">Configure notification preferences</p>
-              </div>
-            </div>
-          </div>
-          <div className="text-center py-8">
-            <Bell className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-            <h3 className="font-apercu-bold text-lg text-gray-900 mb-2">Notifications Tab Available</h3>
-            <p className="font-apercu-regular text-sm text-gray-600 mb-4">
-              Notification settings will be configured here. This tab is now accessible to Super Admin users.
-            </p>
-            <p className="font-apercu-regular text-xs text-gray-500 mb-4">
-              Configure notification preferences, frequency, and delivery methods.
-            </p>
-            {currentUser?.role?.name === 'Admin' && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-4">
-                <p className="text-amber-700 text-sm">
-                  You have read-only access to this tab as an Admin user.
-                </p>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
+      </Card>
     </div>
   )
 
@@ -2438,15 +1875,14 @@ export default function SettingsPage() {
                 <label className="font-apercu-medium text-sm text-gray-700">Enable Rate Limiting</label>
                 <p className="font-apercu-regular text-xs text-gray-500">Turn on/off global rate limiting</p>
               </div>
-              <label className="flex items-center space-x-2 justify-start sm:justify-end">
-                <input
-                  type="checkbox"
-                  checked={rateLimits.enabled}
-                  onChange={(e) => setRateLimits(prev => ({ ...prev, enabled: e.target.checked }))}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                />
-                <span className="font-apercu-medium text-sm text-gray-700">Enabled</span>
-              </label>
+              <select
+                value={rateLimits.enabled ? 'true' : 'false'}
+                onChange={(e) => setRateLimits(prev => ({ ...prev, enabled: e.target.value === 'true' }))}
+                className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+              >
+                <option value="true">True</option>
+                <option value="false">False</option>
+              </select>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
@@ -2454,15 +1890,14 @@ export default function SettingsPage() {
                 <label className="font-apercu-medium text-sm text-gray-700">Whitelist Admin IPs</label>
                 <p className="font-apercu-regular text-xs text-gray-500">Exempt admin IP addresses from rate limits</p>
               </div>
-              <label className="flex items-center space-x-2 justify-start sm:justify-end">
-                <input
-                  type="checkbox"
-                  checked={rateLimits.whitelistAdminIPs}
-                  onChange={(e) => setRateLimits(prev => ({ ...prev, whitelistAdminIPs: e.target.checked }))}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                />
-                <span className="font-apercu-medium text-sm text-gray-700">Enabled</span>
-              </label>
+              <select
+                value={rateLimits.whitelistAdminIPs ? 'true' : 'false'}
+                onChange={(e) => setRateLimits(prev => ({ ...prev, whitelistAdminIPs: e.target.value === 'true' }))}
+                className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+              >
+                <option value="true">True</option>
+                <option value="false">False</option>
+              </select>
             </div>
 
             <div>
@@ -2771,17 +2206,14 @@ export default function SettingsPage() {
     switch (setting.type) {
       case 'toggle':
         return (
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={Boolean(settingValue)}
-              onChange={(e) => updateSetting(category, setting.key, e.target.checked)}
-              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-            />
-            <span className="font-apercu-medium text-sm text-gray-700">
-              {settingValue ? 'Enabled' : 'Disabled'}
-            </span>
-          </label>
+          <select
+            value={Boolean(settingValue) ? 'true' : 'false'}
+            onChange={(e) => updateSetting(category, setting.key, e.target.value === 'true')}
+            className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+          >
+            <option value="true">True</option>
+            <option value="false">False</option>
+          </select>
         )
 
       case 'select':
@@ -2800,6 +2232,18 @@ export default function SettingsPage() {
                 {option}
               </option>
             ))}
+          </select>
+        )
+
+      case 'boolean':
+        return (
+          <select
+            value={Boolean(settingValue) ? 'true' : 'false'}
+            onChange={(e) => updateSetting(category, setting.key, e.target.value === 'true')}
+            className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+          >
+            <option value="true">True</option>
+            <option value="false">False</option>
           </select>
         )
 
@@ -2866,40 +2310,14 @@ export default function SettingsPage() {
     return (
       <AdminLayoutNew title={t('page.settings.title')} description={t('page.settings.description')}>
         <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading user permissions...</p>
+          <Loader2 className="h-8 w-8 text-indigo-600 animate-spin mx-auto" />
+          <p className="mt-4 font-apercu-regular text-gray-600">Loading user permissions...</p>
         </div>
       </AdminLayoutNew>
     )
   }
 
-  // Fix settings function
-  const fixSettings = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch('/api/admin/fix-settings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
 
-      if (response.ok) {
-        const result = await response.json()
-        success('Settings Fixed', `Created ${result.details.created} settings, updated ${result.details.updated} settings`)
-        // Reload settings
-        await loadSettings()
-      } else {
-        const errorData = await response.json()
-        error('Fix Failed', errorData.error || 'Failed to fix settings')
-      }
-    } catch (err) {
-      console.error('Fix settings error:', err)
-      error('Fix Failed', 'An error occurred while fixing settings')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   // Check permissions - Allow Super Admin and Admin roles only
   const allowedRoles = ['Super Admin', 'Admin']
@@ -2946,122 +2364,9 @@ export default function SettingsPage() {
         </div>
       )} */}
 
-      {/* Settings Management Section */}
-      {currentUser?.role?.name === 'Super Admin' && (
-        <Card className="mb-6 p-6 bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex items-center">
-              <div className="h-12 w-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mr-4">
-                <Database className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-apercu-bold text-lg text-gray-900">Settings Management</h3>
-                <p className="font-apercu-regular text-sm text-gray-600">Import, export, and manage system settings</p>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <Button
-                onClick={restoreSystemBackup}
-                disabled={loading}
-                size="sm"
-                className="bg-green-600 hover:bg-green-700 font-apercu-medium"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Restoring...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Restore System Backup
-                  </>
-                )}
-              </Button>
-              <div className="relative">
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleSettingsImport}
-                  disabled={loading}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                  id="global-settings-import"
-                />
-                <label
-                  htmlFor="global-settings-import"
-                  className={`inline-flex items-center px-3 py-2 text-sm font-apercu-medium rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed ${
-                    loading
-                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                      : 'bg-purple-600 hover:bg-purple-700 text-white'
-                  }`}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Importing...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Import Custom File
-                    </>
-                  )}
-                </label>
-              </div>
-              <Button
-                onClick={exportSettings}
-                disabled={loading}
-                size="sm"
-                className="bg-indigo-600 hover:bg-indigo-700 font-apercu-medium"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Exporting...
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4 mr-2" />
-                    Export Settings
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
 
-      {/* Fix Settings Button for Super Admin */}
-      {currentUser?.role?.name === 'Super Admin' && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-apercu-bold text-sm text-blue-800">Settings Tabs Not Displaying?</h4>
-              <p className="font-apercu-regular text-sm text-blue-700">
-                If you see "Tab Available" messages instead of settings content, click the button to fix it.
-              </p>
-            </div>
-            <Button
-              onClick={fixSettings}
-              disabled={loading}
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700 font-apercu-medium"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Fixing...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Fix Settings Tabs
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
+
+
 
       {/* Tab Navigation - Highly Responsive */}
       <div className="mb-6 sm:mb-8">
@@ -3327,18 +2632,7 @@ export default function SettingsPage() {
           loadSettings()
         }}
         showContactSupport={errorModal.type === 'error'}
-        actions={errorModal.errorCode === 'BACKUP_RESTORE_CONFIRM' ? [
-          {
-            label: 'Cancel',
-            onClick: () => setErrorModal(prev => ({ ...prev, isOpen: false })),
-            variant: 'outline'
-          },
-          {
-            label: 'Restore Backup',
-            onClick: confirmRestoreSystemBackup,
-            variant: 'default'
-          }
-        ] : undefined}
+        actions={undefined}
       />
       </AdminLayoutNew>
   )

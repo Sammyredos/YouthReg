@@ -25,13 +25,11 @@ async function resetDatabase() {
     
     await prisma.admin.deleteMany()
     console.log('   ✅ Admin users cleared')
-    
-    await prisma.rolePermission.deleteMany()
-    console.log('   ✅ Role permissions cleared')
-    
+
+    // Clear roles (this will also clear the role-permission relationships)
     await prisma.role.deleteMany()
     console.log('   ✅ Roles cleared')
-    
+
     await prisma.permission.deleteMany()
     console.log('   ✅ Permissions cleared')
     

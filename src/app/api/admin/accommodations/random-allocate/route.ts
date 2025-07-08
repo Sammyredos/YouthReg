@@ -211,22 +211,32 @@ export async function POST(request: NextRequest) {
 
     const totalAllocated = allocations.length
 
-    // Send room allocation emails to all allocated registrants
+    // Send room allocation emails asynchronously (don't wait for completion)
     let emailResults = null
     if (allocations.length > 0) {
-      try {
-        console.log(`Sending room allocation emails to ${allocations.length} randomly allocated registrants...`)
+      // Start email sending in background without waiting
+      const allocatedRegistrationIds = allocations.map(allocation => allocation.registrationId)
 
-        const allocatedRegistrationIds = allocations.map(allocation => allocation.registrationId)
-        emailResults = await RoomAllocationEmailService.sendBulkRoomAllocationEmailsWithDefaults(
-          allocatedRegistrationIds,
-          currentUser.email
-        )
-
-        console.log('Random allocation bulk email results:', emailResults.summary)
-      } catch (emailError) {
+      // Fire and forget - don't await this
+      RoomAllocationEmailService.sendBulkRoomAllocationEmailsWithDefaults(
+        allocatedRegistrationIds,
+        currentUser.email
+      ).then((results) => {
+        console.log('Random allocation bulk email results:', results.summary)
+      }).catch((emailError) => {
         console.error('Error sending bulk room allocation emails for random allocation:', emailError)
-        // Don't fail the allocation if emails fail
+      })
+
+      console.log(`Started sending room allocation emails to ${allocations.length} randomly allocated registrants in background...`)
+
+      // Return immediate response indicating emails are being sent
+      emailResults = {
+        summary: {
+          total: allocations.length,
+          successful: 0,
+          failed: 0,
+          status: 'sending'
+        }
       }
     }
 

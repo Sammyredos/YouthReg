@@ -19,6 +19,7 @@ import {
   Clock,
   Trash2
 } from 'lucide-react'
+import { capitalizeName } from '@/lib/utils'
 
 interface UserCardProps {
   user: {
@@ -74,14 +75,28 @@ export function UserCard({
   }
 
   const calculateAge = (dateOfBirth: string) => {
-    const today = new Date()
-    const birthDate = new Date(dateOfBirth)
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const monthDiff = today.getMonth() - birthDate.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--
+    if (!dateOfBirth) return null
+
+    try {
+      const today = new Date()
+      const birthDate = new Date(dateOfBirth)
+
+      // Check if the date is valid
+      if (isNaN(birthDate.getTime())) {
+        return null
+      }
+
+      let age = today.getFullYear() - birthDate.getFullYear()
+      const monthDiff = today.getMonth() - birthDate.getMonth()
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--
+      }
+
+      // Return null for negative ages (invalid dates)
+      return age >= 0 ? age : null
+    } catch (error) {
+      return null
     }
-    return age
   }
 
   const formatDate = (dateString: string) => {
@@ -119,7 +134,7 @@ export function UserCard({
       <div className="flex items-start justify-between mb-4">
         <Avatar className="h-10 w-10 lg:h-12 lg:w-12 bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
           <span className="text-white font-apercu-bold text-xs lg:text-sm">
-            {getInitials(user.fullName)}
+            {getInitials(capitalizeName(user.fullName))}
           </span>
         </Avatar>
         
@@ -149,13 +164,20 @@ export function UserCard({
 
       <div className="mb-4">
         <h3 className="font-apercu-bold text-base lg:text-lg text-gray-900 mb-2 line-clamp-2">
-          {user.fullName}
+          {capitalizeName(user.fullName)}
         </h3>
         <div className="space-y-1.5 lg:space-y-2">
           <div className="flex items-center text-xs lg:text-sm text-gray-600">
             <User className="h-3 w-3 lg:h-4 lg:w-4 mr-2 text-gray-400 flex-shrink-0" />
             <span className="font-apercu-regular">
-              {user.age ? `Age ${user.age}` : user.dateOfBirth ? `Age ${calculateAge(user.dateOfBirth)}` : 'Age N/A'} • {user.gender}
+              {(() => {
+                if (user.age) return `Age ${user.age}`
+                if (user.dateOfBirth) {
+                  const calculatedAge = calculateAge(user.dateOfBirth)
+                  return calculatedAge !== null ? `Age ${calculatedAge}` : 'Age N/A'
+                }
+                return 'Age N/A'
+              })()} • {user.gender}
             </span>
           </div>
           <div className="flex items-center text-xs lg:text-sm text-gray-600">

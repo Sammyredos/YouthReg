@@ -173,11 +173,24 @@ export async function PUT(
       parentalPermissionGranted
     } = body
 
-    // Validate required fields
-    if (!fullName || !dateOfBirth || !gender || !emailAddress || !phoneNumber || !address ||
-        !emergencyContactName || !emergencyContactRelationship || !emergencyContactPhone) {
+    // Validate required fields with detailed error messages
+    const missingFields = []
+    if (!fullName?.trim()) missingFields.push('fullName')
+    if (!dateOfBirth) missingFields.push('dateOfBirth')
+    if (!gender?.trim()) missingFields.push('gender')
+    if (!emailAddress?.trim()) missingFields.push('emailAddress')
+    if (!phoneNumber?.trim()) missingFields.push('phoneNumber')
+    if (!address?.trim()) missingFields.push('address')
+    if (!emergencyContactName?.trim()) missingFields.push('emergencyContactName')
+    if (!emergencyContactRelationship?.trim()) missingFields.push('emergencyContactRelationship')
+    if (!emergencyContactPhone?.trim()) missingFields.push('emergencyContactPhone')
+
+    if (missingFields.length > 0) {
+      console.log('Missing fields:', missingFields)
+      console.log('Request body:', JSON.stringify(body, null, 2))
       return NextResponse.json({
-        error: 'Missing required fields'
+        error: `Missing required fields: ${missingFields.join(', ')}`,
+        missingFields
       }, { status: 400 })
     }
 

@@ -14,6 +14,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { StatsCard, StatsGrid } from '@/components/ui/stats-card'
 import { UserCard } from '@/components/ui/user-card'
 import { useTranslation } from '@/contexts/LanguageContext'
+import { clearStatisticsCache } from '@/lib/statistics'
 // import { ModernDatePicker } from '@/components/ui/modern-date-picker' // Commented out as unused
 // import { TableSkeleton } from '@/components/ui/skeleton' // Commented out as unused
 import {
@@ -21,11 +22,11 @@ import {
   Search,
   Download,
   Calendar,
-  Mail,
+
   RefreshCw,
   User,
   Shield,
-  Heart,
+
   AlertTriangle,
   CheckCircle,
   X,
@@ -52,10 +53,7 @@ interface Registration {
   parentGuardianName?: string
   parentGuardianPhone?: string
   parentGuardianEmail?: string
-  medications?: string
-  allergies?: string
-  specialNeeds?: string
-  dietaryRestrictions?: string
+
   // System fields
   createdAt: string
   updatedAt: string
@@ -100,7 +98,7 @@ export default function AdminRegistrations() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedRegistration, setSelectedRegistration] = useState<Registration | null>(null)
   const [isExporting, setIsExporting] = useState(false)
-  const [isSendingEmail, setIsSendingEmail] = useState(false)
+
   const [isEditing, setIsEditing] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editFormData, setEditFormData] = useState<Registration | null>(null)
@@ -136,7 +134,7 @@ export default function AdminRegistrations() {
       // Add cache-busting timestamp to prevent stale data
       const timestamp = Date.now()
       const [registrationsResponse, analyticsResponse] = await Promise.all([
-        fetch(`/api/registrations?limit=50000&_t=${timestamp}`, {
+        fetch(`/api/registrations?limit=50000&refresh=true&_t=${timestamp}`, {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -154,6 +152,7 @@ export default function AdminRegistrations() {
 
       if (registrationsResponse.ok) {
         const data = await registrationsResponse.json()
+        // Data fetched successfully
         setRegistrations(data.registrations || [])
         // Update pagination info based on actual total count from API
         setPagination(prev => ({
@@ -180,12 +179,12 @@ export default function AdminRegistrations() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [error])
+  }, []) // Remove error dependency to prevent infinite loop
 
   // Fetch registrations on component mount
   useEffect(() => {
     fetchRegistrations()
-  }, [fetchRegistrations])
+  }, []) // Remove fetchRegistrations dependency to prevent infinite loop
 
   // Reset to page 1 when search changes
   useEffect(() => {
@@ -277,56 +276,7 @@ export default function AdminRegistrations() {
     }
   }
 
-  const handleSendEmail = async () => {
-    if (!selectedRegistration) return
 
-    setIsSendingEmail(true)
-    try {
-      const response = await fetch('/api/admin/registrations/send-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          registrationId: selectedRegistration.id,
-          recipientEmail: selectedRegistration.emailAddress,
-          recipientName: selectedRegistration.fullName
-        }),
-      })
-
-      if (response.ok) {
-        // Show success toast
-        success('Email Sent Successfully')
-      } else {
-        const errorData = await response.json()
-        const errorMessage = parseApiError(errorData.error || 'Failed to send email')
-
-        // Show detailed error modal
-        setErrorModal({
-          isOpen: true,
-          type: errorMessage.type,
-          title: errorMessage.title,
-          description: errorMessage.description,
-          details: `API Response: ${errorData.error}\nStatus: ${response.status}\nRecipient: ${selectedRegistration.emailAddress}`,
-          errorCode: `EMAIL_${response.status}`
-        })
-      }
-    } catch (err) {
-      console.error('Send email failed:', err)
-
-      // Show network error modal
-      setErrorModal({
-        isOpen: true,
-        type: 'error',
-        title: 'Network Error',
-        description: 'Unable to connect to the email service. Please check your internet connection and try again.',
-        details: `Error: ${err instanceof Error ? err.message : 'Unknown error'}\nRecipient: ${selectedRegistration.emailAddress}\nTime: ${new Date().toISOString()}`,
-        errorCode: 'EMAIL_NETWORK_ERROR'
-      })
-    } finally {
-      setIsSendingEmail(false)
-    }
-  }
 
   // Export all registrations as CSV
   const handleExportCSV = async () => {
@@ -416,11 +366,18 @@ export default function AdminRegistrations() {
         // Immediately remove from local state for instant UI update
         setRegistrations(prev => prev.filter(reg => reg.id !== registrationToDelete.id))
 
-        // Update pagination total
+        // Update pagination total immediately for real-time feedback
         setPagination(prev => ({
           ...prev,
           total: prev.total - 1,
           pages: Math.ceil((prev.total - 1) / prev.limit)
+        }))
+
+        // Update analytics data immediately for real-time stats
+        setAnalyticsData(prev => ({
+          ...prev,
+          // Note: We don't update today/week counts here as they need server calculation
+          // They will be refreshed in the background fetch
         }))
 
         // Close modals
@@ -428,7 +385,10 @@ export default function AdminRegistrations() {
         setSelectedRegistration(null)
         setRegistrationToDelete(null)
 
-        // Refresh the registrations list in background to ensure consistency
+        // Clear global stats cache to ensure all pages get updated stats
+        clearStatisticsCache()
+
+        // Refresh the registrations list and analytics in background to ensure consistency
         setTimeout(() => {
           fetchRegistrations()
         }, 500)
@@ -462,18 +422,58 @@ export default function AdminRegistrations() {
     setRegistrationToDelete(null)
   }
 
-  const handleEditRegistration = () => {
+  const handleEditRegistration = async () => {
     if (!selectedRegistration) return
 
-    // Set the form data to the current registration
-    setEditFormData({ ...selectedRegistration })
+    // Prepare registration data for editing
+
+    // Check if we have all the required fields, if not fetch fresh data
+    const hasAllFields = selectedRegistration.address !== undefined &&
+                        selectedRegistration.emergencyContactName !== undefined &&
+                        selectedRegistration.parentGuardianName !== undefined
+
+    let registrationData = selectedRegistration
+
+    if (!hasAllFields) {
+      // Missing fields detected, fetching fresh registration data
+      try {
+        const response = await fetch(`/api/admin/registrations/${selectedRegistration.id}`)
+        if (response.ok) {
+          const result = await response.json()
+          registrationData = result.registration
+          // Fresh data fetched successfully
+        }
+      } catch (error) {
+        console.error('Failed to fetch fresh registration data:', error)
+      }
+    }
+
+    // Set the form data to the current registration with default values for missing fields
+    const formData = {
+      ...registrationData,
+      // Ensure required fields have default values if they're null/undefined
+      fullName: registrationData.fullName || '',
+      dateOfBirth: registrationData.dateOfBirth || '',
+      gender: registrationData.gender || '',
+      emailAddress: registrationData.emailAddress || '',
+      phoneNumber: registrationData.phoneNumber || '',
+      address: registrationData.address || '',
+      emergencyContactName: registrationData.emergencyContactName || '',
+      emergencyContactRelationship: registrationData.emergencyContactRelationship || '',
+      emergencyContactPhone: registrationData.emergencyContactPhone || '',
+      parentGuardianName: registrationData.parentGuardianName || '',
+      parentGuardianPhone: registrationData.parentGuardianPhone || '',
+      parentGuardianEmail: registrationData.parentGuardianEmail || ''
+    }
+
+    // Set form data for editing
+    setEditFormData(formData)
     setShowEditModal(true)
   }
 
   const handleCloseModal = () => {
     setSelectedRegistration(null)
     setIsExporting(false)
-    setIsSendingEmail(false)
     setIsEditing(false)
   }
 
@@ -488,6 +488,8 @@ export default function AdminRegistrations() {
 
     setIsEditing(true)
     try {
+      // Prepare data for submission
+
       const response = await fetch(`/api/admin/registrations/${editFormData.id}`, {
         method: 'PUT',
         headers: {
@@ -557,10 +559,7 @@ export default function AdminRegistrations() {
       'Parent/Guardian Name',
       'Parent/Guardian Phone',
       'Parent/Guardian Email',
-      'Medications',
-      'Allergies',
-      'Special Needs',
-      'Dietary Restrictions',
+
       'Registration Date',
       'Registration ID'
     ]
@@ -578,10 +577,7 @@ export default function AdminRegistrations() {
         `"${reg.parentGuardianName || ''}"`,
         `"${reg.parentGuardianPhone || ''}"`,
         `"${reg.parentGuardianEmail || ''}"`,
-        `"${(reg.medications || '').replace(/"/g, '""')}"`,
-        `"${(reg.allergies || '').replace(/"/g, '""')}"`,
-        `"${(reg.specialNeeds || '').replace(/"/g, '""')}"`,
-        `"${(reg.dietaryRestrictions || '').replace(/"/g, '""')}"`,
+
         `"${formatDate(reg.createdAt)}"`,
         `"${reg.id}"`
       ].join(','))
@@ -624,13 +620,7 @@ export default function AdminRegistrations() {
             <p><strong>Email:</strong> ${registration.parentGuardianEmail || 'Not provided'}</p>
           </div>
 
-          <div>
-            <h3 style="color: #374151; font-size: 18px; margin-bottom: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Medical Information</h3>
-            <p><strong>Medications:</strong> ${registration.medications || 'None'}</p>
-            <p><strong>Allergies:</strong> ${registration.allergies || 'None'}</p>
-            <p><strong>Special Needs:</strong> ${registration.specialNeeds || 'None'}</p>
-            <p><strong>Dietary Restrictions:</strong> ${registration.dietaryRestrictions || 'None'}</p>
-          </div>
+
         </div>
 
         <div style="background-color: #f9fafb; padding: 15px; border-radius: 6px;">
@@ -887,29 +877,7 @@ export default function AdminRegistrations() {
         </div>
         ` : ''}
 
-        ${registration.medications || registration.allergies ? `
-        <div class="section">
-            <h2 class="section-title">
-                <span class="section-icon">🏥</span>
-                Medical Information
-            </h2>
-            <div class="field-grid">
 
-                ${registration.medications ? `
-                <div class="field full-width">
-                    <div class="field-label">Current Medications</div>
-                    <div class="field-value">${registration.medications}</div>
-                </div>
-                ` : ''}
-                ${registration.allergies ? `
-                <div class="field full-width">
-                    <div class="field-label">Known Allergies</div>
-                    <div class="field-value">${registration.allergies}</div>
-                </div>
-                ` : ''}
-            </div>
-        </div>
-        ` : ''}
 
 
 
@@ -1314,7 +1282,7 @@ export default function AdminRegistrations() {
                   size="sm"
                   onClick={handleCloseModal}
                   className="text-white hover:bg-white/20 flex-shrink-0 ml-2"
-                  disabled={isExporting || isSendingEmail || isEditing}
+                  disabled={isExporting || isEditing}
                 >
                   <X className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
@@ -1414,41 +1382,7 @@ export default function AdminRegistrations() {
                   </div>
                 )}
 
-                {/* Medical & Dietary Information */}
-                {(selectedRegistration.medications || selectedRegistration.allergies || selectedRegistration.specialNeeds || selectedRegistration.dietaryRestrictions) && (
-                  <div>
-                    <h4 className="font-apercu-bold text-lg text-gray-900 mb-4 flex items-center">
-                      <Heart className="h-5 w-5 mr-2 text-green-600" />
-                      Medical & Dietary Information
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {selectedRegistration.medications && (
-                        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                          <label className="block font-apercu-medium text-sm text-green-700 mb-1">Medications</label>
-                          <p className="font-apercu-regular text-green-900">{selectedRegistration.medications}</p>
-                        </div>
-                      )}
-                      {selectedRegistration.allergies && (
-                        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                          <label className="block font-apercu-medium text-sm text-green-700 mb-1">Allergies</label>
-                          <p className="font-apercu-regular text-green-900">{selectedRegistration.allergies}</p>
-                        </div>
-                      )}
-                      {selectedRegistration.specialNeeds && (
-                        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                          <label className="block font-apercu-medium text-sm text-green-700 mb-1">Special Needs</label>
-                          <p className="font-apercu-regular text-green-900">{selectedRegistration.specialNeeds}</p>
-                        </div>
-                      )}
-                      {selectedRegistration.dietaryRestrictions && (
-                        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                          <label className="block font-apercu-medium text-sm text-green-700 mb-1">Dietary Restrictions</label>
-                          <p className="font-apercu-regular text-green-900">{selectedRegistration.dietaryRestrictions}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+
 
                 {/* Registration Information */}
                 <div>
@@ -1490,28 +1424,14 @@ export default function AdminRegistrations() {
                       <span className="hidden sm:inline">{isExporting ? 'Exporting...' : 'Export PDF'}</span>
                       <span className="sm:hidden">{isExporting ? 'Exporting...' : 'PDF'}</span>
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="font-apercu-medium text-sm"
-                      onClick={handleSendEmail}
-                      disabled={isSendingEmail}
-                      size="sm"
-                    >
-                      {isSendingEmail ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Mail className="h-4 w-4 mr-2" />
-                      )}
-                      <span className="hidden sm:inline">{isSendingEmail ? 'Sending...' : 'Send Email'}</span>
-                      <span className="sm:hidden">{isSendingEmail ? 'Sending...' : 'Email'}</span>
-                    </Button>
+
                   </div>
                   <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                     <Button
                       variant="outline"
                       className="font-apercu-medium text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 text-sm"
                       onClick={() => handleDeleteRegistration(selectedRegistration)}
-                      disabled={isExporting || isSendingEmail || isEditing}
+                      disabled={isExporting || isEditing}
                       size="sm"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
@@ -1522,7 +1442,7 @@ export default function AdminRegistrations() {
                       variant="outline"
                       onClick={handleCloseModal}
                       className="font-apercu-medium text-sm"
-                      disabled={isExporting || isSendingEmail || isEditing}
+                      disabled={isExporting || isEditing}
                       size="sm"
                     >
                       Close
@@ -1598,10 +1518,11 @@ export default function AdminRegistrations() {
                         Full Name
                       </label>
                       <Input
-                        value={editFormData.fullName}
+                        value={editFormData.fullName || ''}
                         onChange={(e) => handleEditFormChange('fullName', e.target.value)}
                         className="font-apercu-regular"
                         disabled={isEditing}
+                        placeholder="Enter full name"
                       />
                     </div>
                     <div>
@@ -1610,7 +1531,7 @@ export default function AdminRegistrations() {
                       </label>
                       <Input
                         type="date"
-                        value={editFormData.dateOfBirth}
+                        value={editFormData.dateOfBirth || ''}
                         onChange={(e) => handleEditFormChange('dateOfBirth', e.target.value)}
                         className="font-apercu-regular"
                         disabled={isEditing}
@@ -1622,7 +1543,7 @@ export default function AdminRegistrations() {
                         Gender
                       </label>
                       <select
-                        value={editFormData.gender}
+                        value={editFormData.gender || 'Male'}
                         onChange={(e) => handleEditFormChange('gender', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         disabled={isEditing}
@@ -1636,7 +1557,7 @@ export default function AdminRegistrations() {
                         Phone Number
                       </label>
                       <Input
-                        value={editFormData.phoneNumber}
+                        value={editFormData.phoneNumber || ''}
                         onChange={(e) => handleEditFormChange('phoneNumber', e.target.value)}
                         className="font-apercu-regular"
                         disabled={isEditing}
@@ -1649,7 +1570,7 @@ export default function AdminRegistrations() {
                       </label>
                       <Input
                         type="email"
-                        value={editFormData.emailAddress}
+                        value={editFormData.emailAddress || ''}
                         onChange={(e) => handleEditFormChange('emailAddress', e.target.value)}
                         className="font-apercu-regular"
                         disabled={isEditing}
@@ -1661,7 +1582,7 @@ export default function AdminRegistrations() {
                         Address
                       </label>
                       <Input
-                        value={editFormData.address}
+                        value={editFormData.address || ''}
                         onChange={(e) => handleEditFormChange('address', e.target.value)}
                         className="font-apercu-regular"
                         disabled={isEditing}
@@ -1685,10 +1606,11 @@ export default function AdminRegistrations() {
                         Contact Name
                       </label>
                       <Input
-                        value={editFormData.emergencyContactName}
+                        value={editFormData.emergencyContactName || ''}
                         onChange={(e) => handleEditFormChange('emergencyContactName', e.target.value)}
                         className="font-apercu-regular"
                         disabled={isEditing}
+                        placeholder="Enter emergency contact name"
                       />
                     </div>
                     <div>
@@ -1696,10 +1618,11 @@ export default function AdminRegistrations() {
                         Relationship
                       </label>
                       <Input
-                        value={editFormData.emergencyContactRelationship}
+                        value={editFormData.emergencyContactRelationship || ''}
                         onChange={(e) => handleEditFormChange('emergencyContactRelationship', e.target.value)}
                         className="font-apercu-regular"
                         disabled={isEditing}
+                        placeholder="Enter relationship"
                       />
                     </div>
                     <div>
@@ -1707,76 +1630,63 @@ export default function AdminRegistrations() {
                         Phone Number
                       </label>
                       <Input
-                        value={editFormData.emergencyContactPhone}
+                        value={editFormData.emergencyContactPhone || ''}
                         onChange={(e) => handleEditFormChange('emergencyContactPhone', e.target.value)}
                         className="font-apercu-regular"
                         disabled={isEditing}
+                        placeholder="Enter phone number"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Medical Information Section */}
+                {/* Parent/Guardian Section */}
                 <div>
                   <h4 className="font-apercu-bold text-lg text-gray-900 mb-4 flex items-center">
-                    <Heart className="h-5 w-5 mr-2 text-green-600" />
-                    Medical & Dietary Information
+                    <Shield className="h-5 w-5 mr-2 text-blue-600" />
+                    Parent/Guardian Information
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block font-apercu-medium text-sm text-gray-700 mb-2">
-                        Medications
+                        Parent/Guardian Name
                       </label>
-                      <textarea
-                        value={editFormData.medications || ''}
-                        onChange={(e) => handleEditFormChange('medications', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
+                      <Input
+                        value={editFormData.parentGuardianName || ''}
+                        onChange={(e) => handleEditFormChange('parentGuardianName', e.target.value)}
+                        className="font-apercu-regular"
                         disabled={isEditing}
-                        rows={3}
-                        placeholder="List any medications..."
+                        placeholder="Enter parent/guardian name"
                       />
                     </div>
                     <div>
                       <label className="block font-apercu-medium text-sm text-gray-700 mb-2">
-                        Allergies
+                        Parent/Guardian Phone
                       </label>
-                      <textarea
-                        value={editFormData.allergies || ''}
-                        onChange={(e) => handleEditFormChange('allergies', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
+                      <Input
+                        value={editFormData.parentGuardianPhone || ''}
+                        onChange={(e) => handleEditFormChange('parentGuardianPhone', e.target.value)}
+                        className="font-apercu-regular"
                         disabled={isEditing}
-                        rows={3}
-                        placeholder="List any allergies..."
+                        placeholder="Enter phone number"
                       />
                     </div>
-                    <div>
+                    <div className="md:col-span-2">
                       <label className="block font-apercu-medium text-sm text-gray-700 mb-2">
-                        Special Needs
+                        Parent/Guardian Email
                       </label>
-                      <textarea
-                        value={editFormData.specialNeeds || ''}
-                        onChange={(e) => handleEditFormChange('specialNeeds', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
+                      <Input
+                        type="email"
+                        value={editFormData.parentGuardianEmail || ''}
+                        onChange={(e) => handleEditFormChange('parentGuardianEmail', e.target.value)}
+                        className="font-apercu-regular"
                         disabled={isEditing}
-                        rows={3}
-                        placeholder="Describe any special needs..."
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-apercu-medium text-sm text-gray-700 mb-2">
-                        Dietary Restrictions
-                      </label>
-                      <textarea
-                        value={editFormData.dietaryRestrictions || ''}
-                        onChange={(e) => handleEditFormChange('dietaryRestrictions', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg font-apercu-regular focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
-                        disabled={isEditing}
-                        rows={3}
-                        placeholder="List any dietary restrictions..."
+                        placeholder="Enter email address"
                       />
                     </div>
                   </div>
                 </div>
+
 
               </div>
             </div>
@@ -1900,9 +1810,6 @@ export default function AdminRegistrations() {
         showRetry={errorModal.type === 'error'}
         onRetry={() => {
           setErrorModal(prev => ({ ...prev, isOpen: false }))
-          if (selectedRegistration) {
-            handleSendEmail()
-          }
         }}
         showContactSupport={errorModal.type === 'error'}
       />

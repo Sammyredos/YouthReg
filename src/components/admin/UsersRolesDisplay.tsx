@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { UserDirectorySkeleton } from '@/components/ui/skeleton'
+import { capitalizeName } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import {
   Users,
@@ -190,7 +191,7 @@ export function UsersRolesDisplay({ isOpen, onClose }: UsersRolesDisplayProps) {
                         <div className="flex items-start space-x-3">
                           <div className="h-10 w-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
                             <span className="text-white font-apercu-bold text-sm">
-                              {user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                              {capitalizeName(user.name).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">

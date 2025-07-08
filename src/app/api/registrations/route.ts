@@ -6,6 +6,11 @@ import { authenticateRequest } from '@/lib/auth-helpers'
 const registrationsCache = new Map<string, { data: any; timestamp: number }>()
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
+// Function to clear cache (useful when data structure changes)
+export function clearRegistrationsCache() {
+  registrationsCache.clear()
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Authenticate user
@@ -29,12 +34,13 @@ export async function GET(request: NextRequest) {
     const limit = limitParam ? parseInt(limitParam) : null // null means no limit (get all)
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status') || ''
+    const forceRefresh = searchParams.get('refresh') === 'true'
 
     // Create cache key based on query parameters
     const cacheKey = `registrations_${page}_${limit || 'all'}_${search}_${status}_${currentUser.email}`
 
-    // Check cache first (only for large datasets)
-    if (!limit || limit >= 100) {
+    // Check cache first (only for large datasets and not force refresh)
+    if (!forceRefresh && (!limit || limit >= 100)) {
       const cached = registrationsCache.get(cacheKey)
       if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
         return NextResponse.json(cached.data, {
@@ -80,11 +86,20 @@ export async function GET(request: NextRequest) {
         phoneNumber: true,
         gender: true,
         dateOfBirth: true,
+        address: true,
+        emergencyContactName: true,
+        emergencyContactRelationship: true,
+        emergencyContactPhone: true,
+        parentGuardianName: true,
+        parentGuardianPhone: true,
+        parentGuardianEmail: true,
         isVerified: true,
         attendanceMarked: true,
         verifiedAt: true,
         verifiedBy: true,
         createdAt: true,
+        updatedAt: true,
+        qrCode: true,
         roomAllocation: {
           select: {
             id: true,

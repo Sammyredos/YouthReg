@@ -38,9 +38,10 @@ interface RoomSetupModalProps {
   onClose: () => void
   onSave: () => void
   room?: Room | null
+  defaultGender?: 'Male' | 'Female' | null
 }
 
-export function RoomSetupModal({ isOpen, onClose, onSave, room }: RoomSetupModalProps) {
+export function RoomSetupModal({ isOpen, onClose, onSave, room, defaultGender }: RoomSetupModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     gender: '',
@@ -74,14 +75,14 @@ export function RoomSetupModal({ isOpen, onClose, onSave, room }: RoomSetupModal
     } else {
       setFormData({
         name: '',
-        gender: '',
+        gender: defaultGender || '',
         capacity: '',
         description: '',
         isActive: true
       })
     }
     setErrors({})
-  }, [room, isOpen])
+  }, [room, defaultGender, isOpen])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}

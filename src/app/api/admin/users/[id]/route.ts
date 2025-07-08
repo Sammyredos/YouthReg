@@ -41,9 +41,10 @@ export async function PUT(
     }
 
     // Check if admin has permission to update users
-    const hasPermission = currentAdmin.role?.permissions.some(
-      p => p.name === 'users.write' || p.name === 'users.manage' || p.name === 'system.manage'
-    )
+    const hasPermission = ['Super Admin', 'Admin', 'Manager', 'Staff'].includes(currentAdmin.role?.name || '') ||
+      currentAdmin.role?.permissions.some(
+        p => p.name === 'users.write' || p.name === 'users.manage' || p.name === 'system.manage'
+      )
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -258,9 +259,10 @@ export async function DELETE(
     }
 
     // Check if admin has permission to delete users
-    const hasPermission = currentAdmin.role?.permissions.some(
-      p => p.name === 'users.delete' || p.name === 'users.manage' || p.name === 'system.manage'
-    )
+    const hasPermission = ['Super Admin', 'Admin', 'Manager', 'Staff'].includes(currentAdmin.role?.name || '') ||
+      currentAdmin.role?.permissions.some(
+        p => p.name === 'users.delete' || p.name === 'users.manage' || p.name === 'system.manage'
+      )
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -390,9 +392,10 @@ export async function GET(
     }
 
     // Check if admin has permission to read users
-    const hasPermission = currentAdmin.role?.permissions.some(
-      p => p.name === 'users.read' || p.name === 'users.manage' || p.name === 'system.manage'
-    )
+    const hasPermission = ['Super Admin', 'Admin', 'Manager', 'Staff'].includes(currentAdmin.role?.name || '') ||
+      currentAdmin.role?.permissions.some(
+        p => p.name === 'users.read' || p.name === 'users.manage' || p.name === 'system.manage'
+      )
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })

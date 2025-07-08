@@ -31,6 +31,7 @@ export function AllocationSetupModal({ isOpen, onCloseAction, onCompleteAction, 
   const [ageRangeYears, setAgeRangeYears] = useState('5')
   const [allocationType, setAllocationType] = useState<'age-based' | 'random'>('age-based')
   const [loading, setLoading] = useState(false)
+  const [progress, setProgress] = useState('')
 
   const { success, error } = useToast()
   const { triggerStatsUpdate } = useAccommodationUpdates()
@@ -57,6 +58,7 @@ export function AllocationSetupModal({ isOpen, onCloseAction, onCompleteAction, 
 
     try {
       setLoading(true)
+      setProgress('Initializing allocation...')
 
       // Choose API endpoint based on allocation type
       const endpoint = allocationType === 'random'
@@ -67,25 +69,46 @@ export function AllocationSetupModal({ isOpen, onCloseAction, onCompleteAction, 
         ? { gender: gender !== 'All' ? gender : undefined }
         : { ageRangeYears: parseInt(ageRangeYears), gender: gender !== 'All' ? gender : undefined }
 
+      setProgress('Allocating participants to rooms...')
+
+      // Add timeout protection (30 seconds)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => {
+        controller.abort()
+      }, 30000)
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Failed to allocate rooms')
       }
 
+      setProgress('Processing allocation results...')
       const data = await response.json()
 
       if (data.totalAllocated > 0) {
+        // Show immediate success message
+        const emailStatus = data.emailResults?.status === 'sending'
+          ? ' Allocation emails are being sent in the background.'
+          : ''
+
+        showToast(
+          `Successfully allocated ${data.totalAllocated} participants to rooms.${emailStatus}`,
+          'success'
+        )
+
         // Trigger real-time stats update after successful allocation
         triggerStatsUpdate()
-        // Don't show toast here - let the parent component handle it to avoid duplicates
         onCompleteAction(data)
         onCloseAction()
       } else {
@@ -93,10 +116,16 @@ export function AllocationSetupModal({ isOpen, onCloseAction, onCompleteAction, 
       }
     } catch (error) {
       console.error('Error allocating rooms:', error)
-      const errorMessage = parseApiError(error)
-      showToast(errorMessage.description, 'error')
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        showToast('Allocation request timed out. Please try again or contact support.', 'error')
+      } else {
+        const errorMessage = parseApiError(error)
+        showToast(errorMessage.description, 'error')
+      }
     } finally {
       setLoading(false)
+      setProgress('')
     }
   }
 
@@ -304,7 +333,9 @@ export function AllocationSetupModal({ isOpen, onCloseAction, onCompleteAction, 
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {allocationType === 'random' ? 'Randomly Allocating...' : 'Allocating...'}
+                    <span className="truncate text-white">
+                      {progress || (allocationType === 'random' ? 'Randomly Allocating...' : 'Allocating...')}
+                    </span>
                   </>
                 ) : (
                   <>

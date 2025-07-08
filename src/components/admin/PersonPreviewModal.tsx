@@ -21,7 +21,7 @@ import {
   Phone,
   MapPin,
   Calendar,
-  Heart,
+
   Shield,
   Home,
   UserMinus,
@@ -29,6 +29,8 @@ import {
   Copy,
   CheckCircle
 } from 'lucide-react'
+import { calculateAge } from '@/lib/age-calculator'
+import { capitalizeName } from '@/lib/utils'
 
 interface Registration {
   id: string
@@ -44,10 +46,7 @@ interface Registration {
   parentGuardianName?: string
   parentGuardianPhone?: string
   parentGuardianEmail?: string
-  medications?: string
-  allergies?: string
-  specialNeeds?: string
-  dietaryRestrictions?: string
+
   createdAt: string
 }
 
@@ -262,7 +261,7 @@ export function PersonPreviewModal({ isOpen, onCloseAction, registrationId, onRe
                 <div className="space-y-3">
                   <div>
                     <label className="font-apercu-medium text-sm text-gray-600">Full Name</label>
-                    <p className="font-apercu-regular text-sm text-gray-900 break-words">{registration.fullName}</p>
+                    <p className="font-apercu-regular text-sm text-gray-900 break-words">{capitalizeName(registration.fullName)}</p>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -404,42 +403,7 @@ export function PersonPreviewModal({ isOpen, onCloseAction, registrationId, onRe
               </div>
             )}
 
-            {/* Medical Information */}
-            {(registration.medications || registration.allergies || registration.specialNeeds || registration.dietaryRestrictions) && (
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="font-apercu-bold text-lg text-gray-900 flex items-center mb-4">
-                  <Heart className="h-5 w-5 mr-2 text-red-600" />
-                  Medical & Dietary Information
-                </h3>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {registration.medications && (
-                    <div>
-                      <label className="font-apercu-medium text-sm text-gray-600">Medications</label>
-                      <p className="font-apercu-regular text-sm text-gray-900 break-words">{registration.medications}</p>
-                    </div>
-                  )}
-                  {registration.allergies && (
-                    <div>
-                      <label className="font-apercu-medium text-sm text-gray-600">Allergies</label>
-                      <p className="font-apercu-regular text-sm text-gray-900 break-words">{registration.allergies}</p>
-                    </div>
-                  )}
-                  {registration.specialNeeds && (
-                    <div>
-                      <label className="font-apercu-medium text-sm text-gray-600">Special Needs</label>
-                      <p className="font-apercu-regular text-sm text-gray-900 break-words">{registration.specialNeeds}</p>
-                    </div>
-                  )}
-                  {registration.dietaryRestrictions && (
-                    <div>
-                      <label className="font-apercu-medium text-sm text-gray-600">Dietary Restrictions</label>
-                      <p className="font-apercu-regular text-sm text-gray-900 break-words">{registration.dietaryRestrictions}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
             {/* Registration Date */}
             <div className="border-t border-gray-200 pt-4">

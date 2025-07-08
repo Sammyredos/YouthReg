@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
 import { ArrowRight, Clock, CheckCircle, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
+import { capitalizeName } from '@/lib/utils'
 
 interface Registration {
   id: string
@@ -102,14 +103,14 @@ export function RecentRegistrations({ registrations }: RecentRegistrationsProps)
             <div key={registration.id} className="flex items-start sm:items-center space-x-3 sm:space-x-4 p-2 sm:p-3 rounded-lg hover:bg-gray-50 transition-colors">
               <Avatar className="h-8 w-8 sm:h-10 sm:w-10 bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
                 <span className="text-white font-apercu-bold text-xs sm:text-sm">
-                  {getInitials(registration.fullName)}
+                  {getInitials(capitalizeName(registration.fullName))}
                 </span>
               </Avatar>
 
               <div className="flex-1 min-w-0">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
                   <p className="font-apercu-medium text-sm text-gray-900 truncate">
-                    {registration.fullName}
+                    {capitalizeName(registration.fullName)}
                   </p>
                   <div className="flex gap-1 sm:gap-2">
                     {isNewRegistration(registration.createdAt) && (

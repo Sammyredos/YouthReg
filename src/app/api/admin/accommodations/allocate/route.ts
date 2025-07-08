@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Get all active rooms (only Male and Female)
+    // Get all active rooms (only Male and Female) with optimized query
     const rooms = await prisma.room.findMany({
       where: {
         isActive: true,
@@ -71,7 +71,17 @@ export async function POST(request: NextRequest) {
         }
       },
       include: {
-        allocations: true
+        allocations: {
+          include: {
+            registration: {
+              select: {
+                id: true,
+                dateOfBirth: true,
+                gender: true
+              }
+            }
+          }
+        }
       },
       orderBy: { name: 'asc' }
     })
@@ -163,11 +173,8 @@ export async function POST(request: NextRequest) {
               return { room, suitable: true, reason: 'Empty room' }
             }
 
-            // Get existing occupants' ages
-            const existingAllocations = await prisma.roomAllocation.findMany({
-              where: { roomId: room.id },
-              include: { registration: true }
-            })
+            // Use the allocations already loaded with the room
+            const existingAllocations = room.allocations
 
             if (existingAllocations.length === 0) {
               return { room, suitable: true, reason: 'Empty room' }
@@ -287,22 +294,32 @@ export async function POST(request: NextRequest) {
       invalidateCache.accommodations()
     }
 
-    // Send room allocation emails to all allocated registrants
+    // Send room allocation emails asynchronously (don't wait for completion)
     let emailResults = null
     if (allocations.length > 0) {
-      try {
-        console.log(`Sending room allocation emails to ${allocations.length} registrants...`)
+      // Start email sending in background without waiting
+      const allocatedRegistrationIds = allocations.map(allocation => allocation.registrationId)
 
-        const allocatedRegistrationIds = allocations.map(allocation => allocation.registrationId)
-        emailResults = await RoomAllocationEmailService.sendBulkRoomAllocationEmailsWithDefaults(
-          allocatedRegistrationIds,
-          currentUser.email
-        )
-
-        console.log('Bulk email results:', emailResults.summary)
-      } catch (emailError) {
+      // Fire and forget - don't await this
+      RoomAllocationEmailService.sendBulkRoomAllocationEmailsWithDefaults(
+        allocatedRegistrationIds,
+        currentUser.email
+      ).then((results) => {
+        console.log('Bulk email results:', results.summary)
+      }).catch((emailError) => {
         console.error('Error sending bulk room allocation emails:', emailError)
-        // Don't fail the allocation if emails fail
+      })
+
+      console.log(`Started sending room allocation emails to ${allocations.length} registrants in background...`)
+
+      // Return immediate response indicating emails are being sent
+      emailResults = {
+        summary: {
+          total: allocations.length,
+          successful: 0,
+          failed: 0,
+          status: 'sending'
+        }
       }
     }
 

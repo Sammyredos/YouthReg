@@ -13,12 +13,14 @@ import { formatNumber } from '@/lib/statistics'
 
 import { StatsCard, StatsGrid } from '@/components/ui/stats-card'
 import { useTranslation } from '@/contexts/LanguageContext'
+import { capitalizeName } from '@/lib/utils'
+import { clearStatisticsCache } from '@/lib/statistics'
 
 import { EnhancedBadge, getRoleBadgeVariant, getStatusBadgeVariant } from '@/components/ui/enhanced-badge'
 import { Avatar } from '@/components/ui/avatar'
 import { useToast } from '@/contexts/ToastContext'
 import { ErrorModal } from '@/components/ui/error-modal'
-import { PaginationDebug } from '@/components/ui/pagination-debug'
+
 
 import { useUser } from '@/contexts/UserContext'
 import {
@@ -259,7 +261,7 @@ export default function UsersPage() {
 
   // Fetch users when page changes (only after initial load)
   useEffect(() => {
-    if (initialLoadComplete && currentPage > 1) {
+    if (initialLoadComplete && currentPage >= 1) {
       console.log(`Page changed to ${currentPage}, fetching users`)
       fetchUsers(currentPage)
     }
@@ -359,11 +361,19 @@ export default function UsersPage() {
     // Immediately remove the user from the UI
     setUsers(prevUsers => prevUsers.filter(user => user.id !== deletedUserId))
 
+    // Update stats immediately for real-time feedback
+    setTotalUsers(prev => Math.max(0, prev - 1))
+    setTotalActiveUsers(prev => Math.max(0, prev - 1))
+
     // Clear the selected user to prevent any stale references
     setSelectedUser(null)
 
     // Close the delete modal immediately
     setShowDeleteModal(false)
+
+    // Clear global stats cache and refresh stats from server to ensure accuracy
+    clearStatisticsCache()
+    fetchUserStats()
 
     // Remove from recently deleted after 10 seconds to allow for re-adding if needed
     setTimeout(() => {
@@ -540,8 +550,8 @@ export default function UsersPage() {
     )
   }
 
-  // Check permissions - Allow Super Admin, Admin, and Manager roles
-  const allowedRoles = ['Super Admin', 'Admin', 'Manager']
+  // Check permissions - Allow Super Admin, Admin, Manager, and Staff roles
+  const allowedRoles = ['Super Admin', 'Admin', 'Manager', 'Staff']
   if (currentUser && !allowedRoles.includes(currentUser.role?.name || '')) {
     return (
       <AdminLayoutNew title={t('page.users.title')} description={t('page.users.description')}>
@@ -723,7 +733,7 @@ export default function UsersPage() {
             </div>
             {refreshing && (
               <div className="flex items-center space-x-2 text-sm text-gray-500">
-                <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+                <div className="w-4 h-4 bg-blue-200 rounded animate-pulse"></div>
                 <span className="font-apercu-regular">Refreshing...</span>
               </div>
             )}
@@ -750,11 +760,11 @@ export default function UsersPage() {
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-10 w-10 bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
                         <span className="text-white font-apercu-bold text-sm">
-                          {getInitials(user.name)}
+                          {getInitials(capitalizeName(user.name))}
                         </span>
                       </Avatar>
                       <div className="min-w-0">
-                        <p className="font-apercu-medium text-sm text-gray-900 truncate">{user.name}</p>
+                        <p className="font-apercu-medium text-sm text-gray-900 truncate">{capitalizeName(user.name)}</p>
                         <p className="font-apercu-regular text-xs text-gray-500 truncate">{user.email}</p>
                       </div>
                     </div>
@@ -924,11 +934,11 @@ export default function UsersPage() {
               <div className="flex items-center space-x-3 mb-4">
                 <Avatar className="h-12 w-12 bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
                   <span className="text-white font-apercu-bold text-sm">
-                    {getInitials(user.name)}
+                    {getInitials(capitalizeName(user.name))}
                   </span>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="font-apercu-bold text-base text-gray-900 truncate">{user.name}</p>
+                  <p className="font-apercu-bold text-base text-gray-900 truncate">{capitalizeName(user.name)}</p>
                   <p className="font-apercu-regular text-sm text-gray-500 truncate">{user.email}</p>
                 </div>
               </div>
@@ -1158,16 +1168,7 @@ export default function UsersPage() {
         showContactSupport={errorModal.type === 'error'}
       />
 
-      {/* Pagination Debug Component */}
-      <PaginationDebug
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={totalUsers}
-        itemsPerPage={ITEMS_PER_PAGE}
-        currentItems={users.length}
-        searchTerm={debouncedSearchTerm}
-        filterRole={filterRole}
-      />
+
       </AdminLayoutNew>
   )
 }

@@ -96,7 +96,7 @@ export function NotificationPanel() {
           className="font-apercu-medium"
         >
           {refreshing ? (
-            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            <div className="w-4 h-4 mr-2 bg-gray-300 rounded animate-pulse" />
           ) : (
             <RefreshCw className="h-4 w-4 mr-2" />
           )}

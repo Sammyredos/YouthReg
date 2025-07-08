@@ -78,7 +78,7 @@ export function EmailStatusChecker() {
     return (
       <Card className="p-6">
         <div className="flex items-center space-x-3">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          <div className="w-6 h-6 bg-blue-200 rounded animate-pulse"></div>
           <span>Checking email configuration...</span>
         </div>
       </Card>

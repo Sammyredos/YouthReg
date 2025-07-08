@@ -7,7 +7,7 @@ import { useReactiveSystemName } from '@/components/ui/reactive-system-name'
 import { Card, CardContent, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RegistrationFormSkeleton } from '@/components/ui/skeleton'
-import { ArrowLeft, ArrowRight, Check, User, Calendar, Users, Shield } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, User, Calendar, Users, Shield, Loader2 } from 'lucide-react'
 
 // Types
 interface ValidationError {
@@ -28,10 +28,7 @@ interface FormData {
   parentGuardianName: string
   parentGuardianPhone: string
   parentGuardianEmail: string
-  medications: string
-  allergies: string
-  specialNeeds: string
-  dietaryRestrictions: string
+
   useParentAsEmergencyContact: boolean
 }
 
@@ -163,10 +160,7 @@ const getInitialFormData = (): FormData => ({
   parentGuardianName: '',
   parentGuardianPhone: '',
   parentGuardianEmail: '',
-  medications: '',
-  allergies: '',
-  specialNeeds: '',
-  dietaryRestrictions: '',
+
   useParentAsEmergencyContact: false
 })
 
@@ -505,9 +499,8 @@ function RegistrationForm() {
         throw new Error(errorData.message || 'Registration failed')
       }
 
-      setLoadingMessage('Generating QR code and sending confirmation email...')
-      // Add a small delay to show the message
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Registration successful - show success immediately
+      setLoadingMessage('Registration completed successfully!')
       setSuccess(true)
     } catch (error) {
       console.error('Registration error:', error)
@@ -525,16 +518,9 @@ function RegistrationForm() {
     }
   }
 
-  // Show loading while settings are being loaded
+  // Show skeleton loading while settings are being loaded
   if (settingsLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 font-apercu-regular">Loading registration form...</p>
-        </div>
-      </div>
-    )
+    return <RegistrationFormSkeleton />
   }
 
   // Show form closed message if registration is closed
@@ -573,10 +559,7 @@ function RegistrationForm() {
     )
   }
 
-  // Show skeleton loading while settings are loading
-  if (settingsLoading) {
-    return <RegistrationFormSkeleton />
-  }
+
 
   if (success) {
     return (
@@ -697,40 +680,26 @@ function RegistrationForm() {
         {/* Form Card */}
         <Card className="bg-white shadow-lg border-0 overflow-hidden">
           {loading ? (
-            <div className="relative">
-              <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center">
-                <div className="text-center space-y-4">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-                  <div className="space-y-2">
-                    <p className="text-lg font-apercu-medium text-gray-900">{loadingMessage}</p>
-                    <p className="text-sm text-gray-600 font-apercu-regular">Please wait while we process your information</p>
-                  </div>
+            <CardContent className="space-y-6 p-6 sm:p-8">
+              {/* Loading Header */}
+              <div className="text-center pb-4 sm:pb-6 border-b border-gray-100">
+                <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mb-3 sm:mb-4 shadow-lg">
+                  <User className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                 </div>
+                <CardTitle className="text-lg sm:text-xl lg:text-2xl font-apercu-bold text-gray-900 mb-2 px-2">
+                  Processing Registration
+                </CardTitle>
+                <CardDescription className="text-sm sm:text-base font-apercu-regular text-gray-600 px-2">
+                  {loadingMessage}
+                </CardDescription>
               </div>
-              <div className="opacity-50 pointer-events-none">
-                <CardContent className="space-y-6 p-6 sm:p-8">
-                  <div className="text-center pb-4 sm:pb-6 border-b border-gray-100">
-                    <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mb-3 sm:mb-4 shadow-lg">
-                      <User className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-                    </div>
-                    <CardTitle className="text-lg sm:text-xl lg:text-2xl font-apercu-bold text-gray-900 mb-2 px-2">
-                      Processing Registration
-                    </CardTitle>
-                    <CardDescription className="text-sm sm:text-base font-apercu-regular text-gray-600 px-2">
-                      Your registration is being submitted...
-                    </CardDescription>
-                  </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                      <div key={i} className="space-y-2">
-                        <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                        <div className="h-12 bg-gray-200 rounded animate-pulse"></div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
+
+              {/* Simple Loading Indicator */}
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+                <p className="text-gray-600 font-apercu-regular">Please wait...</p>
               </div>
-            </div>
+            </CardContent>
           ) : (
             <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
             <div className={`transition-opacity duration-150 ${stepTransitioning ? 'opacity-50' : 'opacity-100'}`}>

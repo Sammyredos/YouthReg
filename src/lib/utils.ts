@@ -29,6 +29,15 @@ export function formatDate(date: Date | string): string {
   })
 }
 
+export function capitalizeName(name: string | null | undefined): string {
+  if (!name) return ''
+
+  return name
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
+
 export function formatDateTime(date: Date | string): string {
   const d = new Date(date)
   return d.toLocaleDateString('en-US', {

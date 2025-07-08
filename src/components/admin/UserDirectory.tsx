@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { capitalizeName } from '@/lib/utils'
 import { UserDirectorySkeleton } from '@/components/ui/skeleton'
 import { useUser } from '@/contexts/UserContext'
 import { Input } from '@/components/ui/input'
@@ -188,13 +189,13 @@ export function UserDirectory({ isOpen, onClose, onSendMessage }: UserDirectoryP
                     <div className="flex items-center space-x-3 flex-1 min-w-0">
                       <div className="h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
                         <span className="font-apercu-bold text-white text-sm">
-                          {user.name.charAt(0).toUpperCase()}
+                          {capitalizeName(user.name).charAt(0).toUpperCase()}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2 mb-1">
                           <h4 className="font-apercu-bold text-sm sm:text-base text-gray-900 truncate">
-                            {user.name}
+                            {capitalizeName(user.name)}
                           </h4>
                           <Badge className={`font-apercu-medium text-xs flex-shrink-0 w-fit mt-1 sm:mt-0 ${getRoleBadgeColor(user.role.name)}`}>
                             <div className="flex items-center space-x-1">

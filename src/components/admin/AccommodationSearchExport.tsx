@@ -18,6 +18,8 @@ import {
   Filter,
   X
 } from 'lucide-react'
+import { calculateAge } from '@/lib/age-calculator'
+import { capitalizeName } from '@/lib/utils'
 
 interface SearchResult {
   id: string
@@ -339,7 +341,7 @@ export function AccommodationSearchExport({
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
                       <div>
-                        <h4 className="font-apercu-bold text-sm text-gray-900 truncate">{person.fullName}</h4>
+                        <h4 className="font-apercu-bold text-sm text-gray-900 truncate">{capitalizeName(person.fullName)}</h4>
                         <div className="flex items-center space-x-2 mt-1 flex-wrap">
                           <Badge className={`${person.gender === 'Male' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'} border-0 text-xs`}>
                             {person.gender}

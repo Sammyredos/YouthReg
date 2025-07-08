@@ -314,8 +314,7 @@ export function generateRegistrationNotificationEmail(registration: any) {
                 <h3 style="margin-top: 0; color: #667eea;">Quick Summary</h3>
                 <p><strong>Registration ID:</strong> ${registration.id}</p>
                 <p><strong>Address:</strong> ${registration.address}</p>
-                <p><strong>Medical Info:</strong> ${registration.medications || 'None'} | ${registration.allergies || 'No allergies'}</p>
-                <p><strong>Dietary Restrictions:</strong> ${registration.dietaryRestrictions || 'None'}</p>
+
             </div>
         </div>
 

@@ -95,7 +95,7 @@ export default function EmailDebugPage() {
     return (
       <AdminLayoutNew title="Email Debug" description="Email configuration debugging">
         <div className="flex items-center justify-center py-12">
-          <RefreshCw className="h-8 w-8 animate-spin text-indigo-600" />
+          <div className="w-8 h-8 bg-indigo-200 rounded animate-pulse" />
         </div>
       </AdminLayoutNew>
     )

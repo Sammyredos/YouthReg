@@ -171,18 +171,28 @@ export function FontLoader({
             }} />
           </div>
 
-          {/* Spinner */}
+          {/* Loading Rectangle */}
           <div
             style={{
               width: '32px',
-              height: '32px',
-              border: '2px solid #e5e7eb',
-              borderTop: '2px solid #4f46e5',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto'
+              height: '8px',
+              backgroundColor: '#e5e7eb',
+              borderRadius: '4px',
+              margin: '0 auto',
+              position: 'relative',
+              overflow: 'hidden'
             }}
-          />
+          >
+            <div
+              style={{
+                width: `${loadingProgress}%`,
+                height: '100%',
+                backgroundColor: '#4f46e5',
+                borderRadius: '4px',
+                transition: 'width 0.3s ease'
+              }}
+            />
+          </div>
 
           <p style={{
             fontSize: '12px',
@@ -192,12 +202,7 @@ export function FontLoader({
             {loadingProgress}% complete
           </p>
         </div>
-        <style jsx>{`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}</style>
+
       </div>
     )
   }

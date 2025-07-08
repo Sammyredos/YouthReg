@@ -12,6 +12,7 @@ import { useToast } from '@/contexts/ToastContext'
 // Removed heavy animations for better performance
 import { QRScanner } from '@/components/admin/QRScanner'
 import { UnverificationWarningModal } from '@/components/modals/UnverificationWarningModal'
+import { useAccommodationUpdates, AccommodationUpdatesProvider } from '@/contexts/AccommodationUpdatesContext'
 
 import {
   Activity,
@@ -66,21 +67,29 @@ interface AttendanceStats {
   }>
 }
 
-interface UnverifiedRegistration {
+interface Registration {
   id: string
   fullName: string
   gender: string
-  age: number
+  dateOfBirth: string
   phoneNumber: string
   emailAddress: string
-  hasQRCode: boolean
+  address?: string
+  isVerified: boolean
+  verifiedAt?: string
+  verifiedBy?: string
+  qrCode?: string
+  attendanceMarked?: boolean
+  attendanceTime?: string
+  hasQRCode?: boolean
   createdAt: string
 }
 
-export default function AttendancePage() {
+function AttendancePageContent() {
   const { success, error } = useToast()
+  const { triggerStatsUpdate } = useAccommodationUpdates()
   const [stats, setStats] = useState<AttendanceStats | null>(null)
-  const [registrations, setRegistrations] = useState<UnverifiedRegistration[]>([])
+  const [registrations, setRegistrations] = useState<Registration[]>([])
   const [initialLoading, setInitialLoading] = useState(true)
   const [verifying, setVerifying] = useState<string | null>(null)
   const [unverifying, setUnverifying] = useState<string | null>(null)
@@ -220,6 +229,8 @@ export default function AttendancePage() {
       if (response.ok) {
         // Refresh data with current filter state
         await Promise.all([loadStats(), loadRegistrations()])
+        // Trigger accommodation stats update for real-time button visibility
+        triggerStatsUpdate()
         success(`${data.registration.fullName} has been verified successfully!`)
       } else {
         error(`Verification failed: ${data.error}`)
@@ -281,6 +292,8 @@ export default function AttendancePage() {
       if (response.ok) {
         // Refresh data
         await Promise.all([loadStats(), loadRegistrations()])
+        // Trigger accommodation stats update for real-time button visibility
+        triggerStatsUpdate()
         success(data.message)
         setShowUnverifyModal(false)
         setUnverifyTarget(null)
@@ -921,7 +934,7 @@ export default function AttendancePage() {
                               emailAddress: registration.emailAddress,
                               phoneNumber: registration.phoneNumber,
                               gender: registration.gender,
-                              age: registration.age,
+                              dateOfBirth: registration.dateOfBirth,
                               createdAt: registration.createdAt,
                               isVerified: registration.isVerified || false,
                               hasQRCode: registration.hasQRCode,
@@ -1076,5 +1089,14 @@ export default function AttendancePage() {
       />
 
     </AdminLayoutNew>
+  )
+}
+
+// Wrapper component with accommodation updates provider
+export default function AttendancePage() {
+  return (
+    <AccommodationUpdatesProvider>
+      <AttendancePageContent />
+    </AccommodationUpdatesProvider>
   )
 }

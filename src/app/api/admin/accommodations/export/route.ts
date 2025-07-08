@@ -319,10 +319,7 @@ function generatePDF(registrations: any[]) {
 
     roomRegistrations.forEach((reg, index) => {
       const age = calculateAge(reg.dateOfBirth)
-      const medicalNotes = []
-      if (reg.medications) medicalNotes.push(`Medications: ${reg.medications}`)
-      if (reg.allergies) medicalNotes.push(`Allergies: ${reg.allergies}`)
-      if (reg.specialNeeds) medicalNotes.push(`Special Needs: ${reg.specialNeeds}`)
+      const medicalNotes = ['None'] // Medical information not collected in registration form
 
       htmlContent += `
                 <tr>

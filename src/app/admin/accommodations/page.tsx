@@ -35,7 +35,8 @@ import {
   Search,
   Filter,
   X,
-  Trash2
+  Trash2,
+  Home
 } from 'lucide-react'
 
 interface AccommodationStats {
@@ -92,6 +93,7 @@ function AccommodationsPageContent() {
   const [showAllocationModal, setShowAllocationModal] = useState(false)
   const [allocationGender, setAllocationGender] = useState<'Male' | 'Female' | 'All'>('All')
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null)
+  const [defaultGender, setDefaultGender] = useState<'Male' | 'Female' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showPersonPreview, setShowPersonPreview] = useState(false)
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
@@ -214,6 +216,7 @@ function AccommodationsPageContent() {
 
   const handleCreateRoom = () => {
     setSelectedRoom(null)
+    setDefaultGender(null)
     setShowRoomModal(true)
   }
 
@@ -225,6 +228,7 @@ function AccommodationsPageContent() {
   const handleRoomSaved = () => {
     setShowRoomModal(false)
     setSelectedRoom(null)
+    setDefaultGender(null)
     // Force refresh to ensure new room appears immediately
     fetchAccommodationData()
     // Trigger real-time updates for other components
@@ -233,6 +237,33 @@ function AccommodationsPageContent() {
   }
 
   const handleAutoAllocate = (gender: 'Male' | 'Female' | 'All' = 'All') => {
+    // Check if rooms exist for the selected gender before opening modal
+    const maleRoomsExist = (roomsByGender.Male?.length || 0) > 0
+    const femaleRoomsExist = (roomsByGender.Female?.length || 0) > 0
+
+    if (gender === 'Male' && !maleRoomsExist) {
+      showToast('No Male rooms have been created. Please create Male rooms first.', 'error')
+      return
+    }
+
+    if (gender === 'Female' && !femaleRoomsExist) {
+      showToast('No Female rooms have been created. Please create Female rooms first.', 'error')
+      return
+    }
+
+    if (gender === 'All' && !maleRoomsExist && !femaleRoomsExist) {
+      showToast('No rooms have been created for either Male or Female. Please create rooms first.', 'error')
+      return
+    }
+
+    if (gender === 'All' && !maleRoomsExist) {
+      showToast('No Male rooms have been created. Only Female participants can be allocated.', 'warning')
+    }
+
+    if (gender === 'All' && !femaleRoomsExist) {
+      showToast('No Female rooms have been created. Only Male participants can be allocated.', 'warning')
+    }
+
     setAllocationGender(gender)
     setShowAllocationModal(true)
   }
@@ -250,11 +281,21 @@ function AccommodationsPageContent() {
 
     // Add email results if available
     if (result.emailResults) {
-      const { emailsSent, emailsFailed, totalEmails } = result.emailResults
+      // Handle both old structure (direct properties) and new structure (summary object)
+      const emailData = (result.emailResults as any).summary || result.emailResults
+      const emailsSent = (emailData as any).successful || (emailData as any).emailsSent || 0
+      const emailsFailed = (emailData as any).failed || (emailData as any).emailsFailed || 0
+      const totalEmails = (emailData as any).total || (emailData as any).totalEmails || 0
+      const status = (emailData as any).status
+
       if (totalEmails > 0) {
-        message += `. Room details sent to ${emailsSent} registrants`
-        if (emailsFailed > 0) {
-          message += ` (${emailsFailed} emails failed)`
+        if (status === 'sending') {
+          message += `. Allocation emails are being sent in the background`
+        } else {
+          message += `. Room details sent to ${emailsSent} registrants`
+          if (emailsFailed > 0) {
+            message += ` (${emailsFailed} emails failed)`
+          }
         }
       }
     }
@@ -506,6 +547,49 @@ function AccommodationsPageContent() {
     }
   }, [roomsByGender, activeGenderTab])
 
+  // Computed values for allocation button state and messages
+  const allocationButtonState = useMemo(() => {
+    const maleRoomsExist = (roomsByGender.Male?.length || 0) > 0
+    const femaleRoomsExist = (roomsByGender.Female?.length || 0) > 0
+    const maleUnallocated = (unallocatedByGender.Male?.length || 0) > 0
+    const femaleUnallocated = (unallocatedByGender.Female?.length || 0) > 0
+    const hasUnallocated = stats?.unallocatedRegistrations || 0 > 0
+
+    // Case 1: No rooms for both genders
+    if (!maleRoomsExist && !femaleRoomsExist) {
+      return {
+        disabled: true,
+        message: 'No Rooms for Allocation',
+        description: 'Create Rooms for Male and Female participants to enable Allocation'
+      }
+    }
+
+    // Case 2: Only male rooms exist, but female participants need allocation
+    if (maleRoomsExist && !femaleRoomsExist && femaleUnallocated) {
+      return {
+        disabled: false,
+        message: 'Female Rooms Required',
+        description: 'Create Female rooms to allocate all participants'
+      }
+    }
+
+    // Case 3: Only female rooms exist, but male participants need allocation
+    if (!maleRoomsExist && femaleRoomsExist && maleUnallocated) {
+      return {
+        disabled: false,
+        message: 'Male Rooms Required',
+        description: 'Create Male rooms to allocate all participants'
+      }
+    }
+
+    // Case 4: Both genders have rooms OR only one gender has unallocated participants
+    return {
+      disabled: !hasUnallocated,
+      message: null,
+      description: null
+    }
+  }, [roomsByGender, unallocatedByGender, stats?.unallocatedRegistrations])
+
   const handlePageChange = (gender: 'Male' | 'Female', newPage: number) => {
     if (gender === 'Male') {
       setMalePagination(prev => ({ ...prev, currentPage: newPage }))
@@ -579,21 +663,19 @@ function AccommodationsPageContent() {
                 onClick={() => handleAutoAllocate('All')}
                 variant="outline"
                 className="font-apercu-medium h-12 sm:h-10 text-sm"
-                disabled={!stats?.unallocatedRegistrations}
+                disabled={allocationButtonState.disabled}
               >
                 <Shuffle className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
                 Auto Allocate Rooms
               </Button>
             )}
 
-
-
             {permissions.canAutoAllocate && (
               <Button
                 onClick={handleManualAllocate}
                 variant="outline"
                 className="font-apercu-medium border-green-200 text-green-700 hover:bg-green-50 h-12 sm:h-10 text-sm"
-                disabled={!stats?.unallocatedRegistrations}
+                disabled={allocationButtonState.disabled}
               >
                 <UserPlus className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
                 Manual Allocation
@@ -610,6 +692,47 @@ function AccommodationsPageContent() {
                 Settings
               </Button>
             )}
+          </div>
+        )}
+
+        {/* Allocation Status Message - Mobile Optimized */}
+        {allocationButtonState.message && (
+          <div className="mb-4 sm:mb-6">
+            <div className={`p-3 sm:p-4 rounded-lg border ${
+              allocationButtonState.disabled
+                ? 'bg-red-50 border-red-200'
+                : 'bg-amber-50 border-amber-200'
+            }`}>
+              <div className="flex items-start sm:items-center space-x-3">
+                <div className={`h-6 w-6 sm:h-8 sm:w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  allocationButtonState.disabled
+                    ? 'bg-red-100'
+                    : 'bg-amber-100'
+                }`}>
+                  <Home className={`h-3 w-3 sm:h-4 sm:w-4 ${
+                    allocationButtonState.disabled
+                      ? 'text-red-600'
+                      : 'text-amber-600'
+                  }`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className={`font-apercu-bold text-xs sm:text-sm leading-tight ${
+                    allocationButtonState.disabled
+                      ? 'text-red-800'
+                      : 'text-amber-800'
+                  }`}>
+                    {allocationButtonState.message}
+                  </h3>
+                  <p className={`font-apercu-regular text-xs mt-1 leading-relaxed ${
+                    allocationButtonState.disabled
+                      ? 'text-red-600'
+                      : 'text-amber-600'
+                  }`}>
+                    {allocationButtonState.description}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -653,7 +776,7 @@ function AccommodationsPageContent() {
                         {unallocatedByGender.Male.length} unallocated
                       </Badge>
                     </div>
-                    {permissions.canAutoAllocate && unallocatedByGender.Male.length > 0 && (
+                    {permissions.canAutoAllocate && unallocatedByGender.Male.length > 0 && (roomsByGender.Male?.length || 0) > 0 && (
                       <Button
                         onClick={() => handleAutoAllocate('Male')}
                         size="sm"
@@ -822,6 +945,27 @@ function AccommodationsPageContent() {
                 </div>
               </div>
 
+              {/* Male Rooms Required Message - Mobile Optimized */}
+              {unallocatedByGender.Male && unallocatedByGender.Male.length > 0 && (roomsByGender.Male?.length || 0) === 0 && (
+                <div className="mb-4 sm:mb-6">
+                  <div className="p-3 sm:p-4 rounded-lg border bg-blue-50 border-blue-200">
+                    <div className="flex items-start sm:items-center space-x-3">
+                      <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-full flex items-center justify-center bg-blue-100 flex-shrink-0">
+                        <Home className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-apercu-bold text-xs sm:text-sm text-blue-800 leading-tight">
+                          Male Rooms Required for Allocation
+                        </h3>
+                        <p className="font-apercu-regular text-xs mt-1 text-blue-600 leading-relaxed">
+                          {unallocatedByGender.Male.length} male participants are waiting for room allocation. Create male rooms to proceed.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Room cards grid - 2 cards per viewport on tablet, 4 on desktop, 8 total per page */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
                 {isLoading && !initialLoadComplete ? (
@@ -873,7 +1017,31 @@ function AccommodationsPageContent() {
                 />
               )}
 
-              {/* No results message for Male rooms */}
+              {/* No rooms exist at all for Male */}
+              {(roomsByGender.Male?.length || 0) === 0 && !isLoading && (
+                <div className="text-center py-12">
+                  <Home className="h-16 w-16 text-blue-300 mx-auto mb-4" />
+                  <p className="font-apercu-bold text-lg text-blue-600 mb-2">No Male Rooms Created</p>
+                  <p className="font-apercu-regular text-sm text-blue-500 mb-4">
+                    Create rooms to start allocating male participants
+                  </p>
+                  {permissions.canCreateRooms && (
+                    <Button
+                      onClick={() => {
+                        setSelectedRoom(null)
+                        setDefaultGender('Male')
+                        setShowRoomModal(true)
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 font-apercu-medium"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create First Male Room
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* No results message for Male rooms (when rooms exist but filtered out) */}
               {filteredMaleRooms.length === 0 && (roomsByGender.Male?.length || 0) > 0 && (
                 <div className="text-center py-8">
                   <Search className="h-12 w-12 text-blue-300 mx-auto mb-4" />
@@ -901,7 +1069,7 @@ function AccommodationsPageContent() {
                         {unallocatedByGender.Female.length} unallocated
                       </Badge>
                     </div>
-                    {permissions.canAutoAllocate && unallocatedByGender.Female.length > 0 && (
+                    {permissions.canAutoAllocate && unallocatedByGender.Female.length > 0 && (roomsByGender.Female?.length || 0) > 0 && (
                       <Button
                         onClick={() => handleAutoAllocate('Female')}
                         size="sm"
@@ -1070,6 +1238,27 @@ function AccommodationsPageContent() {
                 </div>
               </div>
 
+              {/* Female Rooms Required Message - Mobile Optimized */}
+              {unallocatedByGender.Female && unallocatedByGender.Female.length > 0 && (roomsByGender.Female?.length || 0) === 0 && (
+                <div className="mb-4 sm:mb-6">
+                  <div className="p-3 sm:p-4 rounded-lg border bg-pink-50 border-pink-200">
+                    <div className="flex items-start sm:items-center space-x-3">
+                      <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-full flex items-center justify-center bg-pink-100 flex-shrink-0">
+                        <Home className="h-3 w-3 sm:h-4 sm:w-4 text-pink-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-apercu-bold text-xs sm:text-sm text-pink-800 leading-tight">
+                          Female Rooms Required for Allocation
+                        </h3>
+                        <p className="font-apercu-regular text-xs mt-1 text-pink-600 leading-relaxed">
+                          {unallocatedByGender.Female.length} female participants are waiting for room allocation. Create female rooms to proceed.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Room cards grid - 2 cards per viewport on tablet, 4 on desktop, 8 total per page */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
                 {isLoading ? (
@@ -1121,7 +1310,31 @@ function AccommodationsPageContent() {
                 />
               )}
 
-              {/* No results message for Female rooms */}
+              {/* No rooms exist at all for Female */}
+              {(roomsByGender.Female?.length || 0) === 0 && !isLoading && (
+                <div className="text-center py-12">
+                  <Home className="h-16 w-16 text-pink-300 mx-auto mb-4" />
+                  <p className="font-apercu-bold text-lg text-pink-600 mb-2">No Female Rooms Created</p>
+                  <p className="font-apercu-regular text-sm text-pink-500 mb-4">
+                    Create rooms to start allocating female participants
+                  </p>
+                  {permissions.canCreateRooms && (
+                    <Button
+                      onClick={() => {
+                        setSelectedRoom(null)
+                        setDefaultGender('Female')
+                        setShowRoomModal(true)
+                      }}
+                      className="bg-pink-600 hover:bg-pink-700 font-apercu-medium"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create First Female Room
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* No results message for Female rooms (when rooms exist but filtered out) */}
               {filteredFemaleRooms.length === 0 && (roomsByGender.Female?.length || 0) > 0 && (
                 <div className="text-center py-8">
                   <Search className="h-12 w-12 text-pink-300 mx-auto mb-4" />
@@ -1140,9 +1353,13 @@ function AccommodationsPageContent() {
         {/* Modals */}
         <RoomSetupModal
           isOpen={showRoomModal}
-          onClose={() => setShowRoomModal(false)}
+          onClose={() => {
+            setShowRoomModal(false)
+            setDefaultGender(null)
+          }}
           onSave={handleRoomSaved}
           room={selectedRoom}
+          defaultGender={defaultGender}
         />
 
         <AllocationSetupModal

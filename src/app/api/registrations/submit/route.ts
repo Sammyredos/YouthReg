@@ -71,32 +71,38 @@ export async function POST(request: NextRequest) {
         parentGuardianPhone: data.parentGuardianPhone,
         parentGuardianEmail: data.parentGuardianEmail,
         roommateRequestConfirmationNumber: null, // Field removed from form
-        medications: data.medications || null,
-        allergies: data.allergies || null,
-        specialNeeds: data.specialNeeds || null,
-        dietaryRestrictions: data.dietaryRestrictions || null,
+        medications: null,
+        allergies: null,
+        specialNeeds: null,
+        dietaryRestrictions: null,
         parentalPermissionGranted: true, // Always mark as completed/approved
         parentalPermissionDate: new Date() // Set current date as completion date
       }
     })
 
-    // Generate QR code for the registration
-    try {
-      const qrResult = await generateRegistrationQR(registration.id)
-      if (qrResult.success) {
-        console.log('QR code generated for registration:', registration.id)
-      } else {
-        console.error('Failed to generate QR code:', qrResult.error)
-        // Don't fail the registration if QR generation fails
-      }
-    } catch (qrError) {
-      console.error('QR code generation error:', qrError)
-      // Don't fail the registration if QR generation fails
-    }
+    // Return success response immediately after saving to database
+    const response = NextResponse.json({
+      success: true,
+      registrationId: registration.id,
+      message: 'Registration submitted successfully'
+    })
 
-    // Create notification record in database
-    try {
-      await prisma.notification.create({
+    // Process background tasks without blocking the response
+    // These operations will continue after the response is sent
+    Promise.allSettled([
+      // Generate QR code for the registration
+      generateRegistrationQR(registration.id).then(qrResult => {
+        if (qrResult.success) {
+          console.log('QR code generated for registration:', registration.id)
+        } else {
+          console.error('Failed to generate QR code:', qrResult.error)
+        }
+      }).catch(qrError => {
+        console.error('QR code generation error:', qrError)
+      }),
+
+      // Create notification record in database
+      prisma.notification.create({
         data: {
           type: 'new_registration',
           title: 'New Registration',
@@ -111,36 +117,36 @@ export async function POST(request: NextRequest) {
             registrationDate: registration.createdAt
           })
         }
+      }).then(() => {
+        console.log('Database notification created for:', registration.fullName)
+      }).catch(notificationError => {
+        console.error('Failed to create notification record:', notificationError)
+      }),
+
+      // Send confirmation email with QR code to registrant
+      sendRegistrationConfirmationEmail(registration).then(() => {
+        console.log('Registration confirmation email sent to:', registration.emailAddress)
+      }).catch(emailError => {
+        console.error('Failed to send registration confirmation email:', emailError)
+      }),
+
+      // Send notification email to admins
+      sendRegistrationNotification(registration).then(() => {
+        console.log('Registration notification sent for:', registration.fullName)
+      }).catch(emailError => {
+        console.error('Failed to send registration notification:', emailError)
       })
-      console.log('Database notification created for:', registration.fullName)
-    } catch (notificationError) {
-      console.error('Failed to create notification record:', notificationError)
-      // Don't fail the registration if notification creation fails
-    }
-
-    // Send confirmation email with QR code to registrant
-    try {
-      await sendRegistrationConfirmationEmail(registration)
-      console.log('Registration confirmation email sent to:', registration.emailAddress)
-    } catch (emailError) {
-      console.error('Failed to send registration confirmation email:', emailError)
-      // Don't fail the registration if email fails
-    }
-
-    // Send notification email to admins (don't wait for it to complete)
-    try {
-      await sendRegistrationNotification(registration)
-      console.log('Registration notification sent for:', registration.fullName)
-    } catch (emailError) {
-      console.error('Failed to send registration notification:', emailError)
-      // Don't fail the registration if email fails
-    }
-
-    return NextResponse.json({
-      success: true,
-      registrationId: registration.id,
-      message: 'Registration submitted successfully'
+    ]).then(results => {
+      console.log('Background tasks completed for registration:', registration.id)
+      // Log any failures for monitoring
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.error(`Background task ${index} failed:`, result.reason)
+        }
+      })
     })
+
+    return response
   } catch (error) {
     console.error('Registration submission error:', error)
     return NextResponse.json(

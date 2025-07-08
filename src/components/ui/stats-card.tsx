@@ -48,20 +48,20 @@ export function StatsCard({
       <div className="p-4 sm:p-5">
         <div className="flex items-start space-x-3">
           {/* Icon */}
-          <div className={`h-10 w-10 ${gradient} rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-200 flex-shrink-0`}>
-            <Icon className="h-5 w-5 text-white" />
+          <div className={`h-8 w-8 sm:h-10 sm:w-10 ${gradient} rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-200 flex-shrink-0`}>
+            <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
           </div>
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <p className="font-apercu-regular text-xs text-gray-500 uppercase tracking-wide mb-1 truncate">
+            <p className="font-apercu-regular text-xs sm:text-xs text-gray-500 uppercase tracking-wide mb-1 truncate">
               {title}
             </p>
-            <p className="font-apercu-bold text-xl sm:text-2xl text-gray-900 leading-tight truncate">
+            <p className="font-apercu-bold text-lg sm:text-xl lg:text-2xl text-gray-900 leading-tight truncate">
               {typeof value === 'number' ? value.toLocaleString() : value}
             </p>
             {subtitle && (
-              <p className="font-apercu-regular text-xs text-gray-600 mt-1 truncate">
+              <p className="font-apercu-regular text-xs sm:text-xs text-gray-600 mt-1 truncate">
                 {subtitle}
               </p>
             )}
@@ -79,12 +79,12 @@ interface StatsGridProps {
 
 export function StatsGrid({ children, columns = 6 }: StatsGridProps) {
   const gridClass = columns === 'auto'
-    ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5'
+    ? 'grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5'
     : columns === 3
-    ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5'
+    ? 'grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 lg:gap-5'
     : columns === 4
-    ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5'
-    : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5'
+    ? 'grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5'
+    : 'grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-5'
 
   return (
     <div className={`${gridClass} mb-6`}>
